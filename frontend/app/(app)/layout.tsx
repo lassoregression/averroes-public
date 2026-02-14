@@ -10,7 +10,8 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { CommentatorPanel } from "@/components/commentator/commentator-panel";
 import { ThemeProvider, useTheme } from "@/lib/theme-context";
@@ -66,23 +67,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
  */
 function ConversationHeader() {
   const { mode, setMode, theme } = useTheme();
+  const pathname = usePathname();
 
   /* Only show when in a conversation (URL has /c/) — welcome screen has its own toggle */
-  const [showToggle, setShowToggle] = useState(false);
-  useEffect(() => {
-    setShowToggle(window.location.pathname.includes("/c/"));
-    /* Listen for URL changes (replaceState from ChatPanel) */
-    const handler = () => setShowToggle(window.location.pathname.includes("/c/"));
-    window.addEventListener("popstate", handler);
-    /* Also watch for pushState/replaceState via a periodic check */
-    const interval = setInterval(handler, 500);
-    return () => {
-      window.removeEventListener("popstate", handler);
-      clearInterval(interval);
-    };
-  }, []);
+  const isInConversation = pathname?.includes("/c/") ?? false;
 
-  if (!showToggle) return null;
+  if (!isInConversation) return null;
 
   return (
     <div style={{

@@ -273,21 +273,26 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
               ),
             );
 
-            /* If workshop says prompt is ready, extract and set as refined prompt */
+            /* If workshop says prompt is ready, extract the refined prompt from delimiters */
             if (event.workshop_ready) {
-              /* Get the final commentator message content */
               setActiveMessages((prev) => {
                 const finalMsg = prev.find((m) => m.id === commentatorId);
                 if (finalMsg) {
-                  /* Strip [WORKSHOP_READY] marker from text */
-                  const cleanText = finalMsg.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
-                  setRefinedPrompt(cleanText);
+                  /* Extract prompt from ---PROMPT---/---END--- delimiters */
+                  const promptMatch = finalMsg.content.match(/---PROMPT---\s*([\s\S]*?)\s*---END---/);
+                  const extracted = promptMatch
+                    ? promptMatch[1].trim()
+                    : finalMsg.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
+                  setRefinedPrompt(extracted);
                   /* Switch back to Freestyle mode */
                   setMode("freestyle");
                 }
                 return prev;
               });
             }
+          } else if (event.type === "title") {
+            /* Title generated for workshop conversation — notify sidebar */
+            window.dispatchEvent(new CustomEvent("conversation-updated"));
           } else if (event.type === "error") {
             setActiveMessages((prev) =>
               prev.map((m) =>

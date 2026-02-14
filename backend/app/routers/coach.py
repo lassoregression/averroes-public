@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.models.schemas import CoachRequest, WorkshopSendRequest, CoachMessageOut, RatingCreate, RatingOut
 from app.services.llm import stream_chat, chat
 from app.prompts.coach import build_coach_prompt, build_workshop_prompt
+from app.routers.chat import _generate_title
 from app.repositories.conversation import (
     conversation_repo,
     message_repo,
@@ -110,6 +111,17 @@ async def workshop_respond(req: CoachRequest):
             )
 
             yield f"data: {json.dumps({'type': 'done', 'coach_message_id': saved['id'], 'workshop_ready': is_ready})}\n\n"
+
+            # Generate title after first workshop exchange
+            if len(workshop_history) == 0:
+                try:
+                    title = await _generate_title(req.message, sanitized)
+                    await conversation_repo.update(
+                        req.conversation_id, DEMO_USER_ID, title=title
+                    )
+                    yield f"data: {json.dumps({'type': 'title', 'title': title})}\n\n"
+                except Exception as e:
+                    logger.warning(f"Workshop title generation failed: {e}")
 
         except Exception as e:
             logger.error(f"Workshop stream error: {e}")

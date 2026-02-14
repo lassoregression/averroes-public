@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from app.models.schemas import ChatRequest, MessageOut
-from app.services.llm import stream_chat
+from app.services.llm import stream_chat, chat
 from app.prompts.assistant import build_assistant_prompt
 from app.repositories.conversation import conversation_repo, message_repo
 from app.middleware.rate_limit import rate_limiter
@@ -47,6 +47,18 @@ async def stream_chat_endpoint(req: ChatRequest):
             saved_msg = await message_repo.create(req.conversation_id, "assistant", sanitized)
             yield f"data: {json.dumps({'type': 'done', 'message_id': saved_msg['id']})}\n\n"
 
+            # Generate title after first exchange (2 messages = first user + first assistant)
+            all_msgs = await message_repo.list_for_conversation(req.conversation_id)
+            if len(all_msgs) == 2:
+                try:
+                    title = await _generate_title(req.message, sanitized)
+                    await conversation_repo.update(
+                        req.conversation_id, DEMO_USER_ID, title=title
+                    )
+                    yield f"data: {json.dumps({'type': 'title', 'title': title})}\n\n"
+                except Exception as e:
+                    logger.warning(f"Title generation failed: {e}")
+
         except Exception as e:
             logger.error(f"Stream error: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': 'An error occurred generating the response.'})}\n\n"
@@ -71,3 +83,27 @@ async def get_messages(conversation_id: str) -> list[MessageOut]:
 
     messages = await message_repo.list_for_conversation(conversation_id)
     return [MessageOut(**m) for m in messages]
+
+
+# Title generation prompt — short, cheap, focused
+_TITLE_SYSTEM_PROMPT = (
+    "Generate a short conversation title (3-6 words) based on the user's message "
+    "and the AI's response. Return ONLY the title, no quotes, no punctuation at the end, "
+    "no explanation. Examples: 'Python Quicksort Implementation', 'Email Draft for Team', "
+    "'React Auth Best Practices'."
+)
+
+
+async def _generate_title(user_message: str, assistant_response: str) -> str:
+    """Generate a short title from the first exchange using the LLM."""
+    messages = [
+        {"role": "user", "content": user_message},
+        {"role": "assistant", "content": assistant_response[:500]},
+        {"role": "user", "content": "Generate a title for this conversation."},
+    ]
+    title = await chat(messages, _TITLE_SYSTEM_PROMPT)
+    # Clean up — strip quotes, limit length
+    title = title.strip().strip('"').strip("'")
+    if len(title) > 60:
+        title = title[:57] + "..."
+    return title

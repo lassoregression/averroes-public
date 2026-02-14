@@ -50,6 +50,7 @@ export function ChatPanel({
     clearRefinedPrompt,
     sendToWorkshop,
     clearActiveConversation,
+    activeMessages,
   } = useCommentator();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,14 +103,20 @@ export function ChatPanel({
 
   /** Handle sending a message — creates conversation if needed, streams response */
   const handleSend = useCallback(async (message: string) => {
+    /* In 0→1 mode, route to workshop — sendToWorkshop handles its own
+       conversation creation, so we skip it here to avoid a race condition
+       where React state hasn't synced the new conversation ID yet. */
+    if (mode === "zero_to_one") {
+      sendToWorkshop(message);
+      return;
+    }
+
     let activeConvoId = convoId;
 
     /* Step 1: Create conversation if this is the first message */
     if (!activeConvoId) {
       try {
-        const convo = await createConversation(
-          mode === "zero_to_one" ? "zero_to_one" : "regular"
-        );
+        const convo = await createConversation("regular");
         activeConvoId = convo.id;
         setConvoId(activeConvoId);
         /* Update URL bar without remounting the component.
@@ -124,12 +131,6 @@ export function ChatPanel({
         ]);
         return;
       }
-    }
-
-    /* Step 2: In 0→1 mode, route to workshop instead of main chat */
-    if (mode === "zero_to_one") {
-      sendToWorkshop(message);
-      return;
     }
 
     /* Step 2b: Run nudge analysis on the prompt (zero cost, heuristic only) */
@@ -178,6 +179,9 @@ export function ChatPanel({
           );
           /* Step 6: Run post-response analysis (heuristic, zero cost) */
           runResponseAnalysis(message, fullResponse);
+        } else if (event.type === "title" && event.title) {
+          /* Title generated — notify sidebar to refetch */
+          window.dispatchEvent(new CustomEvent("conversation-updated"));
         } else if (event.type === "error") {
           /* Show error in the assistant bubble */
           setMessages((prev) =>
@@ -212,7 +216,10 @@ export function ChatPanel({
       {/* ===== MESSAGE AREA =====
           Scrollable container for messages or welcome screen */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-        {messages.length === 0 ? (
+        {/* In 0→1 mode with active workshop, show a minimal placeholder instead of welcome screen */}
+        {messages.length === 0 && mode === "zero_to_one" && activeMessages.length > 0 ? (
+          <WorkshopPlaceholder theme={theme} />
+        ) : messages.length === 0 ? (
           /* Show welcome screen when no messages */
           <WelcomeScreen onSelectPrompt={handleSend} />
         ) : (
@@ -237,6 +244,31 @@ export function ChatPanel({
       {/* ===== CHAT INPUT =====
           Always pinned to the bottom of the panel */}
       <ChatInput ref={chatInputRef} onSubmit={handleSend} isLoading={isLoading} />
+    </div>
+  );
+}
+
+/** Minimal placeholder shown in the main area while 0→1 workshop is active in the panel */
+function WorkshopPlaceholder({ theme }: { theme: ReturnType<typeof useTheme>["theme"] }) {
+  return (
+    <div style={{
+      flex: 1, display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "24px", gap: 12,
+    }}>
+      {/* Sparkle icon */}
+      <div style={{ color: theme.accent, opacity: 0.5 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+        </svg>
+      </div>
+      <p style={{
+        fontSize: 14, color: theme.textSecondary,
+        textAlign: "center", maxWidth: 280, lineHeight: 1.6,
+      }}>
+        Refining your prompt in The Commentator panel →
+      </p>
     </div>
   );
 }

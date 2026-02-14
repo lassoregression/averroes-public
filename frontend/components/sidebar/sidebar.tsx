@@ -10,6 +10,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { listConversations, deleteConversation, type Conversation } from "@/lib/api";
+import { useCommentator } from "@/lib/commentator-context";
+import { useTheme } from "@/lib/theme-context";
 
 /** Format relative timestamp — "2m ago", "3h ago", "Yesterday", etc. */
 function relativeTime(dateStr: string): string {
@@ -31,6 +33,8 @@ export function Sidebar() {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const { clearNudges, clearActiveConversation, setConversationId } = useCommentator();
+  const { setMode } = useTheme();
 
   /* Extract current conversation ID from the URL */
   const activeConvoId = pathname.startsWith("/c/") ? pathname.slice(3) : null;
@@ -57,8 +61,19 @@ export function Sidebar() {
     fetchConversations();
   }, [pathname, fetchConversations]);
 
-  /** Navigate to new conversation */
+  /* Re-fetch when a conversation is updated (e.g., title generated) */
+  useEffect(() => {
+    const handler = () => fetchConversations();
+    window.addEventListener("conversation-updated", handler);
+    return () => window.removeEventListener("conversation-updated", handler);
+  }, [fetchConversations]);
+
+  /** Navigate to new conversation — clear all state so it starts completely fresh */
   const handleNewConversation = () => {
+    clearNudges();
+    clearActiveConversation();
+    setConversationId(null);
+    setMode("freestyle");
     router.push("/");
   };
 
@@ -279,10 +294,6 @@ export function Sidebar() {
           );
         })}
 
-        <div style={{ marginTop: 20, padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          Spaces
-        </div>
-        <p style={{ padding: "4px 10px", fontSize: 12, color: "#444" }}>No spaces yet</p>
       </nav>
 
       {/* Footer */}

@@ -79,7 +79,10 @@ export function CommentatorPanel() {
 
   if (!isPanelOpen) return null;
 
-  const panelWidth = mode === "zero_to_one" ? 380 : 320;
+  /* In 0→1 mode, only expand/overlay AFTER the workshop starts (first prompt sent).
+     Before that, panel looks the same as Freestyle — standard width, no overlay. */
+  const isWorkshopActive = mode === "zero_to_one" && commentatorState === "active";
+  const panelWidth = isWorkshopActive ? 380 : 320;
   /* Use liquid gradient class based on current mode */
   const liquidClass = mode === "freestyle" ? "liquid-blue" : "liquid-red";
 
@@ -94,8 +97,8 @@ export function CommentatorPanel() {
         flexDirection: "column",
         borderLeft: "none",
         transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-        /* In 0→1 mode, panel overlays */
-        ...(mode === "zero_to_one" ? {
+        /* In 0→1 mode, panel overlays only once workshop is active */
+        ...(isWorkshopActive ? {
           position: "absolute" as const,
           right: 0,
           top: 0,
@@ -386,43 +389,98 @@ function FeedItem({
   /* Commentator response */
   if (message.type === "commentator") {
     /* Strip [WORKSHOP_READY] marker from displayed text */
-    const displayContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
-    const isWorkshopReady = message.content.includes("[WORKSHOP_READY]");
+    const cleanContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
+
+    /* Parse out refined prompt if wrapped in ---PROMPT--- / ---END--- delimiters */
+    const promptMatch = cleanContent.match(/---PROMPT---\s*([\s\S]*?)\s*---END---/);
+    const refinedPrompt = promptMatch ? promptMatch[1].trim() : null;
+    /* Commentary is everything outside the delimiters.
+       During streaming, strip partial/complete delimiter markers so they don't
+       show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives). */
+    let commentary = refinedPrompt
+      ? cleanContent.replace(/---PROMPT---[\s\S]*?---END---/, "").trim()
+      : cleanContent.replace(/---PROMPT---[\s\S]*$/, "").trim();
 
     return (
       <div className="animate-fade-in" style={{
         maxWidth: "90%",
-        padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
-        background: isWorkshopReady ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.15)",
-        border: `1px solid ${isWorkshopReady ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.08)"}`,
-        fontSize: 13, lineHeight: 1.5, color: "#ffffff",
+        display: "flex", flexDirection: "column", gap: 8,
       }}>
-        <span className={isStreaming ? "streaming-cursor" : ""}>
-          {displayContent || (isStreaming ? "" : "...")}
-        </span>
-        {/* "Use in chat" / "Send to chat" button — shown after streaming completes */}
-        {!isStreaming && displayContent && (
-          <button
-            onClick={() => onUsePrompt(displayContent)}
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              marginTop: 6, padding: isWorkshopReady ? "5px 12px" : "3px 8px",
-              borderRadius: isWorkshopReady ? 8 : 6,
-              border: `1px solid ${isWorkshopReady ? "rgba(255, 255, 255, 0.3)" : "rgba(255, 255, 255, 0.15)"}`,
-              background: isWorkshopReady ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.08)",
-              color: isWorkshopReady ? "#ffffff" : "rgba(255, 255, 255, 0.7)",
-              fontSize: isWorkshopReady ? 11 : 10,
-              fontWeight: isWorkshopReady ? 600 : 500,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-          >
-            <svg width={isWorkshopReady ? 12 : 10} height={isWorkshopReady ? 12 : 10} viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12l7 7 7-7" />
-            </svg>
-            {isWorkshopReady ? "Send to chat" : "Use in chat"}
-          </button>
+        {/* Commentary bubble — the conversational part */}
+        {commentary && (
+          <div style={{
+            padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
+            background: "rgba(0, 0, 0, 0.15)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            fontSize: 13, lineHeight: 1.5, color: "#ffffff",
+          }}>
+            <span className={isStreaming && !refinedPrompt ? "streaming-cursor" : ""}>
+              {commentary}
+            </span>
+          </div>
+        )}
+
+        {/* Refined prompt card — distinct cell, only shown when a prompt was extracted */}
+        {refinedPrompt && !isStreaming && (
+          <div style={{
+            padding: "10px 12px", borderRadius: 12,
+            background: "rgba(0, 0, 0, 0.3)",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            fontSize: 13, lineHeight: 1.6, color: "#ffffff",
+          }}>
+            {/* Label */}
+            <div style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+              color: "rgba(255, 255, 255, 0.5)",
+              textTransform: "uppercase",
+              marginBottom: 6,
+            }}>
+              Refined prompt
+            </div>
+            {/* The actual prompt text */}
+            <div style={{ color: "rgba(255, 255, 255, 0.95)" }}>
+              {refinedPrompt}
+            </div>
+            {/* "Use in chat" button — only here, on the prompt card */}
+            <button
+              onClick={() => onUsePrompt(refinedPrompt)}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                marginTop: 8, padding: "6px 14px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.3)",
+                background: "rgba(255, 255, 255, 0.15)",
+                color: "#ffffff",
+                fontSize: 11, fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+              Use in chat
+            </button>
+          </div>
+        )}
+
+        {/* Streaming indicator when no content yet */}
+        {!commentary && !refinedPrompt && isStreaming && (
+          <div style={{
+            padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
+            background: "rgba(0, 0, 0, 0.15)",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            fontSize: 13, lineHeight: 1.5, color: "#ffffff",
+          }}>
+            <span className="streaming-cursor">{""}</span>
+          </div>
         )}
       </div>
     );

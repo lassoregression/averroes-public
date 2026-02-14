@@ -167,12 +167,13 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
  * - "error": Something went wrong
  */
 export interface SSEEvent {
-  type: "chunk" | "done" | "error";
+  type: "chunk" | "done" | "error" | "title";
   content?: string;
   message_id?: string;
   coach_message_id?: string;
   workshop_ready?: boolean;
   message?: string;
+  title?: string;
 }
 
 /**
