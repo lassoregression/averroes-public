@@ -19,7 +19,7 @@ import {
   type ReactNode,
 } from "react";
 import { analyzePrompt, analyzeResponse, type Nudge } from "@/lib/nudge-engine";
-import { streamCoach } from "@/lib/api";
+import { streamCoach, streamWorkshop, createConversation } from "@/lib/api";
 import { useTheme } from "@/lib/theme-context";
 
 /* ========================================
@@ -84,6 +84,9 @@ interface CommentatorContextValue {
 
   /** Clear the active conversation */
   clearActiveConversation: () => void;
+
+  /** Send a message to the 0→1 workshop (creates conversation if needed) */
+  sendToWorkshop: (message: string) => Promise<void>;
 }
 
 /* ========================================
@@ -104,7 +107,7 @@ export function useCommentator(): CommentatorContextValue {
    ======================================== */
 
 export function CommentatorProvider({ children }: { children: ReactNode }) {
-  const { setCommentatorState } = useTheme();
+  const { setCommentatorState, setMode } = useTheme();
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [activeMessages, setActiveMessages] = useState<CommentatorMessage[]>([]);
   const [isCommentatorStreaming, setIsCommentatorStreaming] = useState(false);
@@ -212,6 +215,104 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
     [setCommentatorState],
   );
 
+  /** Send a message to the 0→1 workshop for prompt refinement */
+  const sendToWorkshop = useCallback(
+    async (message: string) => {
+      let cId = convoIdRef.current;
+
+      /* Create a conversation if one doesn't exist yet */
+      if (!cId) {
+        try {
+          const convo = await createConversation("zero_to_one");
+          cId = convo.id;
+          convoIdRef.current = cId;
+          setConversationId(cId);
+          /* Update URL without remounting */
+          window.history.replaceState(null, "", `/c/${cId}`);
+        } catch {
+          return;
+        }
+      }
+
+      /* Add user message to commentator feed */
+      const userMsg: CommentatorMessage = {
+        id: `workshop-user-${Date.now()}`,
+        type: "user",
+        content: message,
+        timestamp: new Date(),
+      };
+
+      /* Add empty commentator message for streaming */
+      const commentatorId = `workshop-resp-${Date.now()}`;
+      const commentatorMsg: CommentatorMessage = {
+        id: commentatorId,
+        type: "commentator",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      };
+
+      setActiveMessages((prev) => [...prev, userMsg, commentatorMsg]);
+      setIsCommentatorStreaming(true);
+      setCommentatorState("active");
+
+      try {
+        for await (const event of streamWorkshop(cId, message)) {
+          if (event.type === "chunk" && event.content) {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId
+                  ? { ...m, content: m.content + event.content }
+                  : m,
+              ),
+            );
+          } else if (event.type === "done") {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId ? { ...m, isStreaming: false } : m,
+              ),
+            );
+
+            /* If workshop says prompt is ready, extract and set as refined prompt */
+            if (event.workshop_ready) {
+              /* Get the final commentator message content */
+              setActiveMessages((prev) => {
+                const finalMsg = prev.find((m) => m.id === commentatorId);
+                if (finalMsg) {
+                  /* Strip [WORKSHOP_READY] marker from text */
+                  const cleanText = finalMsg.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
+                  setRefinedPrompt(cleanText);
+                  /* Switch back to Freestyle mode */
+                  setMode("freestyle");
+                }
+                return prev;
+              });
+            }
+          } else if (event.type === "error") {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId
+                  ? { ...m, content: event.message || "Something went wrong.", isStreaming: false }
+                  : m,
+              ),
+            );
+          }
+        }
+      } catch {
+        setActiveMessages((prev) =>
+          prev.map((m) =>
+            m.id === commentatorId
+              ? { ...m, content: "Connection error. Is the backend running?", isStreaming: false }
+              : m,
+          ),
+        );
+      } finally {
+        setIsCommentatorStreaming(false);
+      }
+    },
+    [setCommentatorState, setConversationId, setRefinedPrompt, setMode],
+  );
+
   const clearNudges = useCallback(() => {
     setNudges([]);
     setCommentatorState("dormant");
@@ -243,6 +344,7 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
         sendToCommentator,
         clearNudges,
         clearActiveConversation,
+        sendToWorkshop,
       }}
     >
       {children}

@@ -61,7 +61,7 @@ export interface ThemeColors {
   textTertiary: string;    /* Subtle text (timestamps, hints) */
 
   /* Accents */
-  accent: string;          /* Primary accent (metallic brown in Freestyle) */
+  accent: string;          /* Primary accent (blue/periwinkle in Freestyle, red/coral in 0→1) */
   accentMuted: string;     /* Muted accent for borders, subtle highlights */
 
   /* Borders */
@@ -78,7 +78,7 @@ export interface ThemeColors {
   sidebarText: string;     /* Sidebar text */
 
   /* Commentator panel specific */
-  panelAccent: string;     /* Panel accent color (metallic brown / dark variant) */
+  panelAccent: string;     /* Panel accent color (blue in Freestyle, red in 0→1) */
   nudgeBg: string;         /* Nudge message background */
   nudgeText: string;       /* Nudge message text */
   nudgeBorder: string;     /* Nudge message border */

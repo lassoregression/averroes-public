@@ -59,8 +59,8 @@ Per-exchange toggle. When activated:
 - Same panel structure in both modes, just different accent colors
 
 **Panel color by mode:**
-- Freestyle: Metallic brown accents on light translucent background
-- 0→1: Different accent on dark translucent background
+- Freestyle: Blue/periwinkle (#6366f1) accents on solid blue panel background
+- 0→1: Red/coral (#dc4a4a) accents on solid red panel background
 
 ## Nudge Heuristics Engine (Zero LLM Cost)
 
@@ -112,9 +112,9 @@ Full conversation history (all user messages + all LLM responses) every time com
 ## Visual Identity
 
 - **Aesthetic**: Claude.ai meets Linear — scholarly, intellectual, precise
-- **Freestyle mode**: Light theme. White/black dominant. **Metallic brown** accents.
-- **0→1 mode**: Dark theme. Dark background. Grey/white accents.
-- **Commentator panel**: Translucent/frosted glass effect. Brown accent (Freestyle) / mode-appropriate accent (0→1).
+- **Freestyle mode**: Light theme. White/black dominant. **Blue/periwinkle (#6366f1)** accents. Solid blue commentator panel.
+- **0→1 mode**: Dark theme. Dark background. **Red/coral (#dc4a4a)** accents. Solid red commentator panel.
+- **Theme = mode indicator**: Freestyle = light mode + blue panel. 0→1 = dark mode + red panel. The color shift IS the UX cue.
 - **Feel**: Like a tool built by someone who reads philosophy and ships software.
 - **NOT** playful, NOT corporate. Serious and tasteful.
 
@@ -131,7 +131,7 @@ Full conversation history (all user messages + all LLM responses) every time com
 
 | Element | Reference | Notes |
 |---|---|---|
-| Overall feel | Claude.ai + Linear | Clean, precise, monochrome with metallic brown accent |
+| Overall feel | Claude.ai + Linear | Clean, precise. Freestyle = light + blue. 0→1 = dark + red. |
 | Main chat streaming | ChatGPT | Token-by-token with blinking cursor |
 | Commentator panel | Twitch sidebar | Scrolling observations, always visible, interactive |
 | Panel aesthetic | Apple liquid glass | Frosted/translucent, minimal, premium feel |

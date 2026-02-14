@@ -80,18 +80,18 @@ export function CommentatorPanel() {
   if (!isPanelOpen) return null;
 
   const panelWidth = mode === "zero_to_one" ? 380 : 320;
+  /* Use liquid gradient class based on current mode */
+  const liquidClass = mode === "freestyle" ? "liquid-blue" : "liquid-red";
 
   return (
     <div
-      className="hidden md:flex"
+      className={`hidden md:flex ${liquidClass}`}
       style={{
         width: panelWidth,
         minWidth: panelWidth,
         flexShrink: 0,
         height: "100%",
         flexDirection: "column",
-        /* Solid colored background — matches reference */
-        background: theme.bgPanel,
         borderLeft: "none",
         transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
         /* In 0→1 mode, panel overlays */
@@ -106,9 +106,10 @@ export function CommentatorPanel() {
       }}
     >
       {/* ===== PANEL HEADER ===== */}
-      <div style={{
+      <div className="glass-overlay" style={{
         padding: "16px 16px 14px",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+        background: "rgba(0, 0, 0, 0.15)",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -122,7 +123,7 @@ export function CommentatorPanel() {
           }}>
             The Commentator
           </span>
-          <ObservingBadge state={commentatorState} />
+          <ObservingBadge state={commentatorState} isWorkshop={mode === "zero_to_one"} />
         </div>
 
         {/* Right: Close button */}
@@ -176,8 +177,9 @@ export function CommentatorPanel() {
       {/* ===== INPUT AREA =====
           Shown when commentator is Active or in 0→1 mode */}
       {(commentatorState === "active" || mode === "zero_to_one") && (
-        <div style={{
+        <div className="glass-overlay" style={{
           padding: "10px 14px 14px",
+          background: "rgba(0, 0, 0, 0.15)",
           borderTop: "1px solid rgba(255, 255, 255, 0.1)",
           flexShrink: 0,
         }}>
@@ -193,7 +195,7 @@ export function CommentatorPanel() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Talk to The Commentator..."
+              placeholder={mode === "zero_to_one" ? "What do you want to build?" : "Talk to The Commentator..."}
               rows={1}
               style={{
                 flex: 1, resize: "none", border: "none", outline: "none",
@@ -229,8 +231,9 @@ export function CommentatorPanel() {
       {/* ===== ENGAGE BUTTON =====
           Shown in dormant/nudging state so user can start active coaching */}
       {commentatorState !== "active" && mode !== "zero_to_one" && (
-        <div style={{
+        <div className="glass-overlay" style={{
           padding: "10px 14px 14px",
+          background: "rgba(0, 0, 0, 0.15)",
           borderTop: "1px solid rgba(255, 255, 255, 0.1)",
           flexShrink: 0,
         }}>
@@ -266,24 +269,22 @@ export function CommentatorPanel() {
    Sub-Components
    ======================================== */
 
-/** "Observing Mode" badge — shown in header */
-function ObservingBadge({ state }: { state: CommentatorState }) {
-  const labels = {
-    dormant: "Observing Mode",
-    nudging: "Observing",
-    active: "Active",
-  };
+/** Status badge — shown in header, adapts to mode */
+function ObservingBadge({ state, isWorkshop }: { state: CommentatorState; isWorkshop: boolean }) {
+  const label = isWorkshop
+    ? "Workshop Mode"
+    : { dormant: "Observing Mode", nudging: "Observing", active: "Active" }[state];
 
   return (
     <div style={{
       padding: "2px 8px",
       borderRadius: 10,
-      background: "rgba(255, 255, 255, 0.15)",
+      background: isWorkshop ? "rgba(255, 255, 255, 0.25)" : "rgba(255, 255, 255, 0.15)",
       fontSize: 10, fontWeight: 500,
       color: "rgba(255, 255, 255, 0.8)",
       letterSpacing: "0.02em",
     }}>
-      {labels[state]}
+      {label}
     </div>
   );
 }
@@ -380,37 +381,43 @@ function FeedItem({
 
   /* Commentator response */
   if (message.type === "commentator") {
+    /* Strip [WORKSHOP_READY] marker from displayed text */
+    const displayContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
+    const isWorkshopReady = message.content.includes("[WORKSHOP_READY]");
+
     return (
       <div className="animate-fade-in" style={{
         maxWidth: "90%",
         padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
-        background: "rgba(0, 0, 0, 0.15)",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
+        background: isWorkshopReady ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.15)",
+        border: `1px solid ${isWorkshopReady ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.08)"}`,
         fontSize: 13, lineHeight: 1.5, color: "#ffffff",
       }}>
         <span className={isStreaming ? "streaming-cursor" : ""}>
-          {message.content || (isStreaming ? "" : "...")}
+          {displayContent || (isStreaming ? "" : "...")}
         </span>
-        {/* "Use in chat" button — shown after streaming completes */}
-        {!isStreaming && message.content && (
+        {/* "Use in chat" / "Send to chat" button — shown after streaming completes */}
+        {!isStreaming && displayContent && (
           <button
-            onClick={() => onUsePrompt(message.content)}
+            onClick={() => onUsePrompt(displayContent)}
             style={{
               display: "flex", alignItems: "center", gap: 4,
-              marginTop: 6, padding: "3px 8px",
-              borderRadius: 6,
-              border: "1px solid rgba(255, 255, 255, 0.15)",
-              background: "rgba(255, 255, 255, 0.08)",
-              color: "rgba(255, 255, 255, 0.7)",
-              fontSize: 10, fontWeight: 500, cursor: "pointer",
+              marginTop: 6, padding: isWorkshopReady ? "5px 12px" : "3px 8px",
+              borderRadius: isWorkshopReady ? 8 : 6,
+              border: `1px solid ${isWorkshopReady ? "rgba(255, 255, 255, 0.3)" : "rgba(255, 255, 255, 0.15)"}`,
+              background: isWorkshopReady ? "rgba(255, 255, 255, 0.2)" : "rgba(255, 255, 255, 0.08)",
+              color: isWorkshopReady ? "#ffffff" : "rgba(255, 255, 255, 0.7)",
+              fontSize: isWorkshopReady ? 11 : 10,
+              fontWeight: isWorkshopReady ? 600 : 500,
+              cursor: "pointer",
               transition: "all 0.15s",
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+            <svg width={isWorkshopReady ? 12 : 10} height={isWorkshopReady ? 12 : 10} viewBox="0 0 24 24" fill="none"
               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 5v14M5 12l7 7 7-7" />
             </svg>
-            Use in chat
+            {isWorkshopReady ? "Send to chat" : "Use in chat"}
           </button>
         )}
       </div>

@@ -133,6 +133,53 @@ function detectTaskType(prompt: string): TaskType {
 }
 
 /* ========================================
+   Subject Extraction — Makes nudges contextual
+   ======================================== */
+
+/** Task-type keyword lists — used to strip task keywords and find the user's actual subject */
+const TASK_KEYWORDS = new Set([
+  "write", "build", "create", "implement", "code", "function", "class", "component",
+  "api", "endpoint", "debug", "fix", "refactor", "script", "program", "algorithm",
+  "draft", "email", "blog", "essay", "article", "letter", "copy", "headline",
+  "tagline", "description", "summary", "report", "memo", "proposal",
+  "analyze", "analyse", "compare", "review", "evaluate", "assess", "examine",
+  "audit", "diagnose", "benchmark", "rank", "rate", "score",
+  "story", "poem", "fiction", "creative", "imagine", "screenplay", "dialogue",
+  "character", "plot", "narrative", "lyrics", "song", "joke", "humor",
+  "explain", "describe", "define", "overview", "introduction", "guide", "tutorial",
+  "help", "make", "give", "tell", "show", "please", "can", "could", "would",
+  "want", "need", "like", "some", "about",
+]);
+
+/**
+ * Extract the meaningful subject/topic from a prompt by stripping task-type
+ * keywords and stop words. Returns a short phrase the nudge can reference.
+ *
+ * Example: "Write a function to sort an array" → "sorting an array"
+ * Example: "Draft an email about the Q4 results" → "Q4 results"
+ */
+function extractSubject(prompt: string): string {
+  const stopWords = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "can", "shall", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "through", "during",
+    "before", "after", "and", "but", "or", "not", "no", "if", "then",
+    "than", "too", "very", "just", "so", "it", "its", "my", "your",
+    "this", "that", "these", "those", "i", "me", "you", "he", "she",
+    "we", "they", "what", "which", "who", "how",
+  ]);
+
+  const words = prompt.toLowerCase().split(/\W+/).filter(Boolean);
+  /* Remove task keywords and stop words from the front, keep meaningful remainder */
+  const meaningful = words.filter((w) => w.length > 2 && !stopWords.has(w) && !TASK_KEYWORDS.has(w));
+
+  if (meaningful.length === 0) return "this";
+  /* Cap at 4 words to keep it concise */
+  return meaningful.slice(0, 4).join(" ");
+}
+
+/* ========================================
    Layer 2 — Missing Dimension Checks
    ======================================== */
 
@@ -241,11 +288,26 @@ const DIMENSION_MAP: Record<Exclude<TaskType, "general">, DimensionCheck[]> = {
 function checkMissingDimensions(prompt: string, taskType: TaskType): Nudge[] {
   if (taskType === "general") return [];
   const dimensions = DIMENSION_MAP[taskType];
+  const subject = extractSubject(prompt);
   const nudges: Nudge[] = [];
   for (const dim of dimensions) {
     const present = dim.patterns.some((p) => p.test(prompt));
     if (!present) {
-      nudges.push(createNudge(dim.nudge, "missing_dimension", dim.severity, dim.name));
+      /* Inject the user's subject into the nudge for contextual relevance.
+         Replaces generic prefixes like "Code prompt" → "Your [subject] prompt" */
+      const contextualNudge = dim.nudge
+        .replace(/^(Code|Writing|Short \w+|No \w+) prompt/i, `Your ${subject} prompt`)
+        .replace(/^Compare on what\?/, `Compare ${subject} on what?`)
+        .replace(/^How deep/, `How deep into ${subject}`)
+        .replace(/^No style direction\./, `No style direction for ${subject}.`)
+        .replace(/^No constraints\./, `No constraints for ${subject}.`)
+        .replace(/^No tone specified\./, `No tone for ${subject} specified.`)
+        .replace(/^No length guidance\./, `No length guidance for ${subject}.`)
+        .replace(/^What goes in/, `What goes into your ${subject}`)
+        .replace(/^What should happen when/, `What should happen with ${subject} when`)
+        .replace(/^How do you want the/, `How do you want your ${subject}`)
+        .replace(/^Why do you need to know this\?/, `Why do you need to know about ${subject}?`);
+      nudges.push(createNudge(contextualNudge, "missing_dimension", dim.severity, dim.name));
     }
   }
   return nudges;
@@ -298,14 +360,15 @@ function detectAntiPatterns(prompt: string, taskType: TaskType): Nudge[] {
     }
   }
 
-  /* Short prompt — task-specific suggestion */
+  /* Short prompt — task-specific suggestion with subject context */
   if (words < 10) {
+    const subject = extractSubject(prompt);
     const shortNudges: Record<TaskType, string> = {
-      code: "Short code prompt. Add: language, what it should do, inputs/outputs, error handling.",
-      writing: "Short writing prompt. Add: audience, tone, length, and purpose.",
-      analysis: "Short analysis prompt. Add: what you're analyzing, criteria, output format.",
-      creative: "Short creative prompt. Add: style, length, constraints \u2014 creativity thrives on boundaries.",
-      research: "Short research prompt. Add: depth, what you already know, and why you need this.",
+      code: `Short prompt for ${subject}. Add: language, what it should do, inputs/outputs, error handling.`,
+      writing: `Short prompt for ${subject}. Add: audience, tone, length, and purpose.`,
+      analysis: `Short prompt for ${subject}. Add: what you're analyzing, criteria, output format.`,
+      creative: `Short prompt for ${subject}. Add: style, length, constraints \u2014 creativity thrives on boundaries.`,
+      research: `Short prompt about ${subject}. Add: depth, what you already know, and why you need this.`,
       general: "Very short prompt. The more context you give, the less the AI has to guess.",
     };
     nudges.push(createNudge(shortNudges[taskType], "anti_pattern", words < 5 ? "strong" : "medium"));
@@ -322,11 +385,13 @@ function analyzeResponseSignals(prompt: string, response: string): Nudge[] {
   const nudges: Nudge[] = [];
   const promptWords = wordCount(prompt);
   const responseWords = wordCount(response);
+  const taskType = detectTaskType(prompt);
+  const subject = extractSubject(prompt);
 
   /* Long response for short prompt = AI compensating for vagueness */
   if (responseWords > 800 && promptWords < 20) {
     nudges.push(createNudge(
-      "Long response for a short prompt \u2014 the AI is covering its bases. Adding constraints would tighten this.",
+      `The AI wrote ${responseWords}+ words about ${subject} \u2014 your prompt didn't set boundaries. Try adding length or format constraints.`,
       "post_response", "medium",
     ));
   }
@@ -335,8 +400,17 @@ function analyzeResponseSignals(prompt: string, response: string): Nudge[] {
   const afterFirstSentence = response.replace(/^[^.!?]*[.!?]\s*/, "");
   const questionCount = (afterFirstSentence.match(/\?/g) || []).length;
   if (questionCount >= 2) {
+    /* Determine which dimensions were likely missing based on task type */
+    const missingHints: Record<TaskType, string> = {
+      code: "language, inputs/outputs, or edge cases",
+      writing: "audience, tone, or length",
+      analysis: "criteria or output format",
+      creative: "style, constraints, or perspective",
+      research: "depth or use case",
+      general: "key details",
+    };
     nudges.push(createNudge(
-      "The AI is asking you questions \u2014 it didn't have enough info. Your prompt was missing key details.",
+      `The AI asked clarifying questions about ${subject} \u2014 your prompt was missing ${missingHints[taskType]}.`,
       "post_response", "strong",
     ));
   }
@@ -354,7 +428,7 @@ function analyzeResponseSignals(prompt: string, response: string): Nudge[] {
   const multipleOptions = /\b(here are (a few|some|several)|option\s*[1-3]|approach\s*[1-3]|alternatively|on the other hand|you could (also|either))\b/i;
   if (multipleOptions.test(response)) {
     nudges.push(createNudge(
-      "The AI offered multiple approaches \u2014 your prompt didn't specify one. If you know what you want, say so.",
+      `The AI offered multiple approaches for ${subject} \u2014 next time specify which approach you want.`,
       "post_response", "medium",
     ));
   }

@@ -22,7 +22,7 @@ export function Sidebar() {
           onClick={() => setCollapsed(false)}
           style={{
             width: 30, height: 30, borderRadius: 8,
-            background: "#c53030", border: "none", cursor: "pointer",
+            background: "#6366f1", border: "none", cursor: "pointer",
             color: "#fff", fontSize: 12, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
@@ -51,7 +51,7 @@ export function Sidebar() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8,
-            background: "#c53030", display: "flex",
+            background: "#6366f1", display: "flex",
             alignItems: "center", justifyContent: "center",
             fontSize: 12, fontWeight: 700,
           }}>A</div>

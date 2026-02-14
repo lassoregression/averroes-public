@@ -160,10 +160,10 @@ Manual test scenarios for verifying nudge heuristics, commentator behavior, mode
 ## 7. Theme Switching
 
 ### 7.1 Freestyle Default
-**Expected:** White/light background. Black text. Metallic brown accents.
+**Expected:** White/light background. Black text. Blue/periwinkle (#6366f1) accents. Solid blue commentator panel.
 
 ### 7.2 0→1 Active
-**Expected:** Dark background. Light text. Grey/white accents. Smooth transition (not jarring).
+**Expected:** Dark background. Light text. Red/coral (#dc4a4a) accents. Solid red commentator panel. Smooth transition (not jarring).
 
 ### 7.3 Return to Freestyle
 **Action:** Complete 0→1 workshop.

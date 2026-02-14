@@ -64,7 +64,7 @@ body {
 .streaming-cursor::after {
   content: "▊";
   animation: blink 1s step-end infinite;
-  color: #6366f1;
+  color: var(--cursor-color, #6366f1);
   font-weight: 200;
   margin-left: 1px;
 }
@@ -93,6 +93,47 @@ body {
    ======================================== */
 .animate-fade-in {
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========================================
+   Commentator Panel — Liquid gradient backgrounds
+   ======================================== */
+@keyframes liquidFlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.liquid-blue {
+  background: linear-gradient(135deg,
+    #5B7FFF 0%,
+    #4A6FEE 15%,
+    #6B8FFF 30%,
+    #4E73F5 45%,
+    #5B7FFF 60%,
+    #7B9FFF 75%,
+    #5B7FFF 100%
+  );
+  background-size: 400% 400%;
+  animation: liquidFlow 20s ease-in-out infinite;
+}
+
+.liquid-red {
+  background: linear-gradient(135deg,
+    #FF4B4B 0%,
+    #EE3A3A 15%,
+    #FF5B5B 30%,
+    #F54545 45%,
+    #FF4B4B 60%,
+    #FF6B6B 75%,
+    #FF4B4B 100%
+  );
+  background-size: 400% 400%;
+  animation: liquidFlow 20s ease-in-out infinite;
+}
+
+.glass-overlay {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 /* ========================================

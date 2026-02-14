@@ -48,6 +48,8 @@ export function ChatPanel({
     clearNudges,
     refinedPrompt,
     clearRefinedPrompt,
+    sendToWorkshop,
+    clearActiveConversation,
   } = useCommentator();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,8 +74,10 @@ export function ChatPanel({
     if (refinedPrompt && chatInputRef.current) {
       chatInputRef.current.setInput(refinedPrompt);
       clearRefinedPrompt();
+      /* Clear workshop messages and return commentator to dormant state */
+      clearActiveConversation();
     }
-  }, [refinedPrompt, clearRefinedPrompt]);
+  }, [refinedPrompt, clearRefinedPrompt, clearActiveConversation]);
 
   /** Handle sending a message — creates conversation if needed, streams response */
   const handleSend = useCallback(async (message: string) => {
@@ -101,7 +105,13 @@ export function ChatPanel({
       }
     }
 
-    /* Step 2: Run nudge analysis on the prompt (zero cost, heuristic only) */
+    /* Step 2: In 0→1 mode, route to workshop instead of main chat */
+    if (mode === "zero_to_one") {
+      sendToWorkshop(message);
+      return;
+    }
+
+    /* Step 2b: Run nudge analysis on the prompt (zero cost, heuristic only) */
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     clearNudges();
     runPromptAnalysis(message, history);
