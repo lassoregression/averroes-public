@@ -17,7 +17,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { WelcomeScreen } from "./welcome-screen";
 import { ChatInput, type ChatInputHandle } from "./chat-input";
 import { MessageBubble } from "./message-bubble";
-import { createConversation, streamChat } from "@/lib/api";
+import { createConversation, streamChat, getMessages } from "@/lib/api";
 import { useTheme } from "@/lib/theme-context";
 import { useCommentator } from "@/lib/commentator-context";
 
@@ -56,6 +56,27 @@ export function ChatPanel({
   const [convoId, setConvoId] = useState<string | null>(initialConvoId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
+
+  /** Load existing messages when navigating to a conversation */
+  useEffect(() => {
+    if (initialConvoId && initialMessages.length === 0) {
+      getMessages(initialConvoId)
+        .then((msgs) => {
+          setMessages(
+            msgs
+              .filter((m) => m.role !== "system")
+              .map((m) => ({
+                id: m.id,
+                role: m.role as "user" | "assistant",
+                content: m.content,
+              })),
+          );
+        })
+        .catch(() => {
+          /* API might not be running */
+        });
+    }
+  }, [initialConvoId, initialMessages.length]);
 
   /** Auto-scroll to the bottom when messages change */
   useEffect(() => {

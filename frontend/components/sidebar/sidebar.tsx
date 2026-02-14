@@ -1,13 +1,71 @@
 /**
  * Sidebar — Dark, Arc-style navigation.
  * Hidden on mobile (<768px), collapsible on desktop.
+ *
+ * Fetches real conversation data from the API.
+ * Supports new conversation creation and navigation.
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { listConversations, type Conversation } from "@/lib/api";
+
+/** Format relative timestamp — "2m ago", "3h ago", "Yesterday", etc. */
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  /* Extract current conversation ID from the URL */
+  const activeConvoId = pathname.startsWith("/c/") ? pathname.slice(3) : null;
+
+  /** Fetch conversations from the API */
+  const fetchConversations = useCallback(async () => {
+    try {
+      const convos = await listConversations();
+      setConversations(convos);
+    } catch {
+      /* API might not be running — fail silently */
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /* Fetch on mount */
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  /* Re-fetch when URL changes (new conversation created) */
+  useEffect(() => {
+    fetchConversations();
+  }, [pathname, fetchConversations]);
+
+  /** Navigate to new conversation */
+  const handleNewConversation = () => {
+    router.push("/");
+  };
+
+  /** Navigate to existing conversation */
+  const handleSelectConversation = (id: string) => {
+    router.push(`/c/${id}`);
+  };
 
   if (collapsed) {
     return (
@@ -85,12 +143,15 @@ export function Sidebar() {
           <span style={{ marginLeft: "auto", fontSize: 10, color: "#444" }}>⌘K</span>
         </button>
 
-        <button style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-          padding: "8px 12px", marginTop: 4, borderRadius: 10,
-          background: "transparent", border: "none", color: "#888",
-          fontSize: 12, cursor: "pointer",
-        }}>
+        <button
+          onClick={handleNewConversation}
+          style={{
+            width: "100%", display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 12px", marginTop: 4, borderRadius: 10,
+            background: "transparent", border: "none", color: "#888",
+            fontSize: 12, cursor: "pointer",
+          }}
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -98,35 +159,72 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Conversations */}
+      {/* Conversations — real data from API */}
       <nav style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
         <div style={{ padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           Recent
         </div>
-        {["Welcome to Averroes", "Marketing strategy draft", "Code review notes"].map((title) => (
-          <button
-            key={title}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "8px 10px", borderRadius: 8, background: "transparent",
-              border: "none", color: "#999", fontSize: 13, cursor: "pointer",
-              textAlign: "left", transition: "all 0.1s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#141414";
-              e.currentTarget.style.color = "#ddd";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "#999";
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, flexShrink: 0 }}>
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
-          </button>
-        ))}
+
+        {/* Loading state */}
+        {isLoading && (
+          <p style={{ padding: "8px 10px", fontSize: 12, color: "#444" }}>Loading...</p>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && conversations.length === 0 && (
+          <p style={{ padding: "8px 10px", fontSize: 12, color: "#444" }}>No conversations yet</p>
+        )}
+
+        {/* Conversation list */}
+        {conversations.map((convo) => {
+          const isActive = convo.id === activeConvoId;
+          return (
+            <button
+              key={convo.id}
+              onClick={() => handleSelectConversation(convo.id)}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 10px", borderRadius: 8,
+                background: isActive ? "#1a1a1a" : "transparent",
+                border: "none",
+                color: isActive ? "#fff" : "#999",
+                fontSize: 13, cursor: "pointer",
+                textAlign: "left", transition: "all 0.1s",
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.background = "#141414";
+                  e.currentTarget.style.color = "#ddd";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#999";
+                }
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: isActive ? 0.7 : 0.4, flexShrink: 0 }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {convo.title || "New conversation"}
+                </div>
+                {/* Preview + timestamp */}
+                <div style={{
+                  display: "flex", justifyContent: "space-between", gap: 4,
+                  fontSize: 10, color: "#555", marginTop: 1,
+                }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    {convo.last_message_preview || "Empty"}
+                  </span>
+                  <span style={{ flexShrink: 0 }}>{relativeTime(convo.updated_at)}</span>
+                </div>
+              </div>
+            </button>
+          );
+        })}
 
         <div style={{ marginTop: 20, padding: "4px 8px", fontSize: 10, fontWeight: 600, color: "#555", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           Spaces
