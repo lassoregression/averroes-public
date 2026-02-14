@@ -159,7 +159,7 @@ export function CommentatorPanel() {
       >
         {/* Dormant state — sparkle icon + idle message */}
         {feed.length === 0 && commentatorState === "dormant" && (
-          <DormantState />
+          <DormantState isWorkshop={mode === "zero_to_one"} />
         )}
 
         {/* Render each feed item */}
@@ -175,8 +175,10 @@ export function CommentatorPanel() {
       </div>
 
       {/* ===== INPUT AREA =====
-          Shown when commentator is Active or in 0→1 mode */}
-      {(commentatorState === "active" || mode === "zero_to_one") && (
+          Shown when commentator is Active (coaching or workshop in progress).
+          In 0→1 mode, the main chat input triggers the workshop — panel input
+          only appears once the back-and-forth is underway. */}
+      {commentatorState === "active" && (
         <div className="glass-overlay" style={{
           padding: "10px 14px 14px",
           background: "rgba(0, 0, 0, 0.15)",
@@ -289,8 +291,8 @@ function ObservingBadge({ state, isWorkshop }: { state: CommentatorState; isWork
   );
 }
 
-/** Dormant state — clean centered idle message */
-function DormantState() {
+/** Dormant state — clean centered idle message, adapts to mode */
+function DormantState({ isWorkshop }: { isWorkshop: boolean }) {
   return (
     <div style={{
       flex: 1, display: "flex", flexDirection: "column",
@@ -303,7 +305,9 @@ function DormantState() {
         textAlign: "center", lineHeight: 1.6, maxWidth: 220,
         letterSpacing: "-0.01em",
       }}>
-        I'll comment on your conversation as it unfolds.
+        {isWorkshop
+          ? "Type your idea in the chat — I'll help you refine it."
+          : "I'll comment on your conversation as it unfolds."}
       </span>
     </div>
   );

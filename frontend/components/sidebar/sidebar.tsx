@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { listConversations, type Conversation } from "@/lib/api";
+import { listConversations, deleteConversation, type Conversation } from "@/lib/api";
 
 /** Format relative timestamp — "2m ago", "3h ago", "Yesterday", etc. */
 function relativeTime(dateStr: string): string {
@@ -65,6 +65,21 @@ export function Sidebar() {
   /** Navigate to existing conversation */
   const handleSelectConversation = (id: string) => {
     router.push(`/c/${id}`);
+  };
+
+  /** Delete a conversation with confirmation */
+  const handleDeleteConversation = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); /* Don't navigate when clicking delete */
+    try {
+      await deleteConversation(id);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      /* If we deleted the active conversation, navigate home */
+      if (id === activeConvoId) {
+        router.push("/");
+      }
+    } catch {
+      /* Fail silently */
+    }
   };
 
   if (collapsed) {
@@ -179,50 +194,88 @@ export function Sidebar() {
         {conversations.map((convo) => {
           const isActive = convo.id === activeConvoId;
           return (
-            <button
+            <div
               key={convo.id}
-              onClick={() => handleSelectConversation(convo.id)}
+              className="sidebar-convo-item"
               style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "8px 10px", borderRadius: 8,
-                background: isActive ? "#1a1a1a" : "transparent",
-                border: "none",
-                color: isActive ? "#fff" : "#999",
-                fontSize: 13, cursor: "pointer",
-                textAlign: "left", transition: "all 0.1s",
+                position: "relative",
+                display: "flex", alignItems: "center",
+                borderRadius: 8,
+                transition: "all 0.1s",
               }}
               onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = "#141414";
-                  e.currentTarget.style.color = "#ddd";
-                }
+                const btn = e.currentTarget.querySelector("button.convo-btn") as HTMLElement;
+                const del = e.currentTarget.querySelector("button.delete-btn") as HTMLElement;
+                if (!isActive && btn) { btn.style.background = "#141414"; btn.style.color = "#ddd"; }
+                if (del) del.style.opacity = "1";
               }}
               onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "#999";
-                }
+                const btn = e.currentTarget.querySelector("button.convo-btn") as HTMLElement;
+                const del = e.currentTarget.querySelector("button.delete-btn") as HTMLElement;
+                if (!isActive && btn) { btn.style.background = "transparent"; btn.style.color = "#999"; }
+                if (del) del.style.opacity = "0";
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: isActive ? 0.7 : 0.4, flexShrink: 0 }}>
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {convo.title || "New conversation"}
+              <button
+                className="convo-btn"
+                onClick={() => handleSelectConversation(convo.id)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 10px", borderRadius: 8,
+                  background: isActive ? "#1a1a1a" : "transparent",
+                  border: "none",
+                  color: isActive ? "#fff" : "#999",
+                  fontSize: 13, cursor: "pointer",
+                  textAlign: "left", transition: "all 0.1s",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: isActive ? 0.7 : 0.4, flexShrink: 0 }}>
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {convo.title || "New conversation"}
+                  </div>
+                  {/* Preview + timestamp */}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", gap: 4,
+                    fontSize: 10, color: "#555", marginTop: 1,
+                  }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                      {convo.last_message_preview || "Empty"}
+                    </span>
+                    <span style={{ flexShrink: 0 }}>{relativeTime(convo.updated_at)}</span>
+                  </div>
                 </div>
-                {/* Preview + timestamp */}
-                <div style={{
-                  display: "flex", justifyContent: "space-between", gap: 4,
-                  fontSize: 10, color: "#555", marginTop: 1,
-                }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                    {convo.last_message_preview || "Empty"}
-                  </span>
-                  <span style={{ flexShrink: 0 }}>{relativeTime(convo.updated_at)}</span>
-                </div>
-              </div>
-            </button>
+              </button>
+              {/* Delete button — appears on hover */}
+              <button
+                className="delete-btn"
+                onClick={(e) => handleDeleteConversation(e, convo.id)}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  width: 24, height: 24, borderRadius: 6,
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#666", opacity: 0,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(220, 74, 74, 0.2)";
+                  e.currentTarget.style.color = "#dc4a4a";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                  e.currentTarget.style.color = "#666";
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                </svg>
+              </button>
+            </div>
           );
         })}
 
