@@ -1,0 +1,105 @@
+/*
+ * Averroes Design System
+ * Font: Geist Sans / Geist Mono
+ * Colors: Blue/periwinkle (Freestyle), Red/coral (0→1)
+ * Feel: Apple-level polish, scholarly, precise
+ */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@source "../components/**/*.tsx";
+@source "../lib/**/*.ts";
+
+/* ========================================
+   Keyframe Animations
+   ======================================== */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   Base
+   ======================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  background: #fafafa;
+  color: #111827;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+}
+
+/* ========================================
+   Scrollbar — Subtle, refined
+   ======================================== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a3a3a3; }
+
+/* ========================================
+   Streaming cursor — blinking block
+   ======================================== */
+.streaming-cursor::after {
+  content: "▊";
+  animation: blink 1s step-end infinite;
+  color: #6366f1;
+  font-weight: 200;
+  margin-left: 1px;
+}
+
+/* ========================================
+   Markdown content — remove trailing margin
+   ======================================== */
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content > *:first-child {
+  margin-top: 0;
+}
+
+/* ========================================
+   Selection
+   ======================================== */
+::selection {
+  background: #c7d2fe;
+  color: #111827;
+}
+
+/* ========================================
+   Fade-in animation class
+   ======================================== */
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========================================
+   Hide Next.js dev badge
+   ======================================== */
+[data-nextjs-toast],
+[data-next-badge],
+nextjs-portal {
+  display: none !important;
+}

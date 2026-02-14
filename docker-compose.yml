@@ -1,0 +1,59 @@
+# ============================================================
+# Averroes — Local Development Environment
+#
+# Runs both the FastAPI backend and Next.js frontend
+# with hot-reload enabled for rapid development.
+#
+# Usage:
+#   docker compose up        # Start both services
+#   docker compose up backend  # Start only the backend
+#   docker compose logs -f    # Follow logs
+#
+# Ports:
+#   - http://localhost:3000  → Frontend (Next.js)
+#   - http://localhost:8000  → Backend (FastAPI)
+#   - http://localhost:8000/docs → API documentation (Swagger)
+# ============================================================
+
+services:
+  # --- Backend: FastAPI + Python ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot-reload
+      - ./backend:/app
+      # Persist SQLite database across container restarts
+      - backend-data:/app/data
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_PATH=/app/data/averroes.db
+      - DEBUG=true
+    # Uvicorn with reload for development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # --- Frontend: Next.js ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot-reload
+      - ./frontend:/app
+      # Don't mount node_modules from host (use container's copy)
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  # Named volume for persistent database storage
+  backend-data:
