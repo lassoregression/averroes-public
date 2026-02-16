@@ -31,12 +31,20 @@ async def coach_respond(req: CoachRequest):
     if not convo:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Build context from conversation history
+    # Build context from conversation history — the commentator observes the full exchange
     messages = await message_repo.list_for_conversation(req.conversation_id)
     conv_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
     system_prompt = build_coach_prompt(conversation_messages=conv_messages)
 
-    coach_messages = [{"role": "user", "content": req.message}]
+    # For auto-triggered coaching, send a generic trigger so the LLM analyzes the
+    # conversation context in the system prompt rather than responding to the prompt directly.
+    # For manual coaching (user types in panel), send their actual message.
+    trigger = (
+        "Analyze the latest exchange in the conversation and provide your observation and refined prompt."
+        if req.coach_type.value == "auto"
+        else req.message
+    )
+    coach_messages = [{"role": "user", "content": trigger}]
 
     async def event_stream():
         full_response = ""

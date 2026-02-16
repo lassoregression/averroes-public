@@ -1,11 +1,9 @@
 /**
- * Chat Input — pinned to bottom of the chat area.
+ * Chat Input — Claude.ai-inspired minimal input pinned to bottom.
  *
- * Auto-resizing textarea, Enter to send, Shift+Enter for newline.
+ * Clean pill shape, subtle shadow, transparent textarea.
+ * Auto-resizing, Enter to send, Shift+Enter for newline.
  * Theme-aware: adapts to Freestyle (light) and 0→1 (dark) modes.
- *
- * Below the input: "Show The Commentator" toggle button
- * (matches the Figma reference — commentator toggle lives under input).
  */
 "use client";
 
@@ -77,25 +75,28 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     <div style={{
       borderTop: `1px solid ${theme.border}`,
       background: theme.bg,
-      padding: "12px 16px 8px",
+      padding: "14px 16px 10px",
       transition: "background 0.4s ease, border-color 0.4s ease",
     }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
 
-        {/* ===== INPUT CONTAINER ===== */}
+        {/* ===== INPUT CONTAINER =====
+            Claude.ai-inspired: rounded-2xl, subtle shadow, minimal padding.
+            The container is the visual pill; textarea inside is transparent. */}
         <div
           style={{
-            display: "flex", alignItems: "flex-end", gap: 10,
-            padding: "10px 14px",
-            border: `1px solid ${theme.border}`,
-            borderRadius: 22,
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "4px 4px 4px 16px",
+            border: `1px solid ${mode === "freestyle" ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)"}`,
+            borderRadius: 16,
             background: mode === "freestyle" ? "#ffffff" : theme.bgSecondary,
             boxShadow: mode === "freestyle"
-              ? "0 1px 8px rgba(0,0,0,0.04)"
-              : "0 1px 8px rgba(0,0,0,0.15)",
-            transition: "all 0.15s",
+              ? "0 4px 20px rgba(0,0,0,0.035)"
+              : "0 4px 20px rgba(0,0,0,0.2)",
+            transition: "box-shadow 0.2s, border-color 0.2s, background 0.4s",
           }}
         >
+          {/* Textarea — transparent, vertically centered via padding */}
           <textarea
             ref={textareaRef}
             value={value}
@@ -106,23 +107,25 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             rows={1}
             style={{
               flex: 1, resize: "none", border: "none", outline: "none",
-              background: "transparent", fontSize: 14, lineHeight: 1.5,
+              background: "transparent",
+              fontSize: 14, lineHeight: "22px",
+              padding: "9px 0",
               color: theme.text, fontFamily: "inherit",
               opacity: isLoading ? 0.5 : 1,
             }}
           />
 
-          {/* Send button */}
+          {/* Send button — sits flush inside the pill */}
           <button
             onClick={handleSubmit}
             disabled={!hasValue || isLoading}
             style={{
-              width: 32, height: 32, borderRadius: 16,
-              border: "none",
+              width: 32, height: 32, borderRadius: 12,
+              border: "none", flexShrink: 0,
               cursor: hasValue && !isLoading ? "pointer" : "default",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.15s",
-              background: hasValue && !isLoading ? theme.accent : theme.borderSubtle,
+              background: hasValue && !isLoading ? theme.accent : "transparent",
               color: hasValue && !isLoading ? "#fff" : theme.textTertiary,
             }}
           >

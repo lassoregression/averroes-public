@@ -68,17 +68,24 @@ export function Sidebar() {
     return () => window.removeEventListener("conversation-updated", handler);
   }, [fetchConversations]);
 
-  /** Navigate to new conversation — clear all state so it starts completely fresh */
+  /** Navigate to new conversation — clear all state so it starts completely fresh.
+   *  Uses window.location.href instead of router.push because the URL may have been
+   *  changed via replaceState (when conversation was created inline), and Next.js
+   *  router doesn't know about that change, making router.push("/") a no-op. */
   const handleNewConversation = () => {
     clearNudges();
     clearActiveConversation();
     setConversationId(null);
     setMode("freestyle");
-    router.push("/");
+    window.location.href = "/";
   };
 
-  /** Navigate to existing conversation */
+  /** Navigate to existing conversation — clear workshop/commentator state
+   *  so stale 0→1 workshop messages don't bleed into the new conversation */
   const handleSelectConversation = (id: string) => {
+    clearNudges();
+    clearActiveConversation();
+    setMode("freestyle");
     router.push(`/c/${id}`);
   };
 
@@ -88,9 +95,13 @@ export function Sidebar() {
     try {
       await deleteConversation(id);
       setConversations((prev) => prev.filter((c) => c.id !== id));
-      /* If we deleted the active conversation, navigate home */
+      /* If we deleted the active conversation, clear state and navigate home */
       if (id === activeConvoId) {
-        router.push("/");
+        clearNudges();
+        clearActiveConversation();
+        setConversationId(null);
+        setMode("freestyle");
+        window.location.href = "/";
       }
     } catch {
       /* Fail silently */

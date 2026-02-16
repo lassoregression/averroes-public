@@ -8,6 +8,9 @@
  * - Dormant: "Observing Mode" badge, sparkle icon, idle message
  * - Nudging: Nudge cards scroll in
  * - Active: Full conversation with The Commentator (LLM calls)
+ *
+ * In 0→1 mode, the panel IS the primary interaction surface — feels like
+ * a text conversation, not a chatbot. Input is always visible.
  */
 "use client";
 
@@ -16,15 +19,18 @@ import { useTheme, type CommentatorState } from "@/lib/theme-context";
 import { useCommentator } from "@/lib/commentator-context";
 import type { CommentatorMessage } from "@/lib/commentator-context";
 import type { Nudge } from "@/lib/nudge-engine";
+import ReactMarkdown from "react-markdown";
 
 export function CommentatorPanel() {
-  const { theme, mode, commentatorState, setCommentatorState, isPanelOpen, setPanelOpen } = useTheme();
+  const { mode, commentatorState, setCommentatorState, isPanelOpen, setPanelOpen } = useTheme();
   const {
     nudges,
     activeMessages,
     isCommentatorStreaming,
     sendToCommentator,
+    sendToWorkshop,
     setRefinedPrompt,
+    workshopComplete,
   } = useCommentator();
   const [inputValue, setInputValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,13 +67,19 @@ export function CommentatorPanel() {
     setRefinedPrompt(text);
   }, [setRefinedPrompt]);
 
-  /** Handle sending a message to the commentator */
+  /** Handle sending a message — routes to workshop in 0→1 mode (pre-complete), coaching otherwise */
   const handleSend = useCallback(() => {
     const trimmed = inputValue.trim();
     if (!trimmed || isCommentatorStreaming) return;
-    sendToCommentator(trimmed);
+    /* In 0→1 mode before workshop completes, send to workshop endpoint.
+       After workshop is done, panel input goes to regular coaching. */
+    if (mode === "zero_to_one" && !workshopComplete) {
+      sendToWorkshop(trimmed);
+    } else {
+      sendToCommentator(trimmed);
+    }
     setInputValue("");
-  }, [inputValue, isCommentatorStreaming, sendToCommentator]);
+  }, [inputValue, isCommentatorStreaming, sendToCommentator, sendToWorkshop, mode, workshopComplete]);
 
   /** Handle Enter key in input */
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -79,12 +91,18 @@ export function CommentatorPanel() {
 
   if (!isPanelOpen) return null;
 
-  /* In 0→1 mode, only expand/overlay AFTER the workshop starts (first prompt sent).
-     Before that, panel looks the same as Freestyle — standard width, no overlay. */
-  const isWorkshopActive = mode === "zero_to_one" && commentatorState === "active";
+  /* In 0→1 mode, only expand/overlay DURING the workshop (not before, not after).
+     Once workshop completes, panel shrinks back so main chat is fully visible. */
+  const isWorkshopActive = mode === "zero_to_one" && commentatorState === "active" && !workshopComplete;
   const panelWidth = isWorkshopActive ? 380 : 320;
   /* Use liquid gradient class based on current mode */
   const liquidClass = mode === "freestyle" ? "liquid-blue" : "liquid-red";
+
+  /* Determine if the input area should show:
+     - 0→1 mode: ALWAYS show input (text conversation feel)
+     - Freestyle: show when user has explicitly engaged (sent a message in panel) */
+  const hasUserEngaged = activeMessages.some(m => m.type === "user");
+  const showInput = mode === "zero_to_one" || hasUserEngaged;
 
   return (
     <div
@@ -178,10 +196,9 @@ export function CommentatorPanel() {
       </div>
 
       {/* ===== INPUT AREA =====
-          Shown when commentator is Active (coaching or workshop in progress).
-          In 0→1 mode, the main chat input triggers the workshop — panel input
-          only appears once the back-and-forth is underway. */}
-      {commentatorState === "active" && (
+          In 0→1 mode: ALWAYS visible — feels like a text conversation.
+          In Freestyle: shown when user explicitly engages (clicks "Talk to The Commentator"). */}
+      {showInput && (
         <div className="glass-overlay" style={{
           padding: "10px 14px 14px",
           background: "rgba(0, 0, 0, 0.15)",
@@ -189,8 +206,8 @@ export function CommentatorPanel() {
           flexShrink: 0,
         }}>
           <div style={{
-            display: "flex", alignItems: "flex-end", gap: 8,
-            padding: "8px 12px",
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "4px 4px 4px 12px",
             background: "rgba(255, 255, 255, 0.1)",
             borderRadius: 14,
             border: "1px solid rgba(255, 255, 255, 0.12)",
@@ -200,11 +217,18 @@ export function CommentatorPanel() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={mode === "zero_to_one" ? "What do you want to build?" : "Talk to The Commentator..."}
+              placeholder={
+                mode === "zero_to_one" && !workshopComplete
+                  ? "What do you want to build?"
+                  : mode === "zero_to_one"
+                  ? "Ask The Commentator..."
+                  : "Talk to The Commentator..."
+              }
               rows={1}
               style={{
                 flex: 1, resize: "none", border: "none", outline: "none",
-                background: "transparent", fontSize: 13, lineHeight: 1.5,
+                background: "transparent", fontSize: 13, lineHeight: "20px",
+                padding: "7px 0",
                 color: "#ffffff", fontFamily: "inherit",
               }}
             />
@@ -234,8 +258,10 @@ export function CommentatorPanel() {
       )}
 
       {/* ===== ENGAGE BUTTON =====
-          Shown in dormant/nudging state so user can start active coaching */}
-      {commentatorState !== "active" && mode !== "zero_to_one" && (
+          Shown in Freestyle when user hasn't engaged the panel yet.
+          Even if auto-commentator has posted observations, user still needs
+          a way to start a conversation. In 0→1, input is always visible. */}
+      {!showInput && (
         <div className="glass-overlay" style={{
           padding: "10px 14px 14px",
           background: "rgba(0, 0, 0, 0.15)",
@@ -309,7 +335,7 @@ function DormantState({ isWorkshop }: { isWorkshop: boolean }) {
         letterSpacing: "-0.01em",
       }}>
         {isWorkshop
-          ? "Type your idea in the chat — I'll help you refine it."
+          ? "Tell me what you're thinking — we'll shape it into something sharp."
           : "I'll comment on your conversation as it unfolds."}
       </span>
     </div>
@@ -371,7 +397,7 @@ function FeedItem({
     );
   }
 
-  /* User message in commentator chat */
+  /* User message in commentator chat — right-aligned like a text conversation */
   if (message.type === "user") {
     return (
       <div className="animate-fade-in" style={{
@@ -386,7 +412,7 @@ function FeedItem({
     );
   }
 
-  /* Commentator response */
+  /* Commentator response — left-aligned like a text conversation */
   if (message.type === "commentator") {
     /* Strip [WORKSHOP_READY] marker from displayed text */
     const cleanContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
@@ -397,7 +423,7 @@ function FeedItem({
     /* Commentary is everything outside the delimiters.
        During streaming, strip partial/complete delimiter markers so they don't
        show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives). */
-    let commentary = refinedPrompt
+    const commentary = refinedPrompt
       ? cleanContent.replace(/---PROMPT---[\s\S]*?---END---/, "").trim()
       : cleanContent.replace(/---PROMPT---[\s\S]*$/, "").trim();
 
@@ -406,17 +432,41 @@ function FeedItem({
         maxWidth: "90%",
         display: "flex", flexDirection: "column", gap: 8,
       }}>
-        {/* Commentary bubble — the conversational part */}
+        {/* Commentary bubble — the conversational part, with markdown support */}
         {commentary && (
-          <div style={{
-            padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
-            background: "rgba(0, 0, 0, 0.15)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            fontSize: 13, lineHeight: 1.5, color: "#ffffff",
-          }}>
-            <span className={isStreaming && !refinedPrompt ? "streaming-cursor" : ""}>
-              {commentary}
-            </span>
+          <div
+            className={`markdown-content ${isStreaming && !refinedPrompt ? "streaming-cursor" : ""}`}
+            style={{
+              padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
+              background: "rgba(0, 0, 0, 0.15)",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              fontSize: 13, lineHeight: 1.5, color: "#ffffff",
+            }}
+          >
+            {isStreaming ? (
+              /* Plain text during streaming to avoid mid-token markdown glitches */
+              <span style={{ whiteSpace: "pre-wrap" }}>{commentary}</span>
+            ) : (
+              /* Full markdown rendering when done */
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p style={{ margin: "0 0 6px 0" }}>{children}</p>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                  em: ({ children }) => <em>{children}</em>,
+                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 16 }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 16 }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                  code: ({ children }) => (
+                    <code style={{
+                      background: "rgba(255,255,255,0.1)", padding: "1px 4px",
+                      borderRadius: 3, fontSize: 12,
+                    }}>{children}</code>
+                  ),
+                }}
+              >
+                {commentary}
+              </ReactMarkdown>
+            )}
           </div>
         )}
 
@@ -471,17 +521,9 @@ function FeedItem({
           </div>
         )}
 
-        {/* Streaming indicator when no content yet */}
-        {!commentary && !refinedPrompt && isStreaming && (
-          <div style={{
-            padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
-            background: "rgba(0, 0, 0, 0.15)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            fontSize: 13, lineHeight: 1.5, color: "#ffffff",
-          }}>
-            <span className="streaming-cursor">{""}</span>
-          </div>
-        )}
+        {/* No ThinkingIndicator here — in the panel, the commentary text
+           appears naturally as it streams in. Showing a blinking indicator
+           alongside nudge cards clutters the UI. */}
       </div>
     );
   }

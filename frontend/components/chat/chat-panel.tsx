@@ -51,6 +51,7 @@ export function ChatPanel({
     sendToWorkshop,
     clearActiveConversation,
     activeMessages,
+    workshopComplete,
   } = useCommentator();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,22 +92,25 @@ export function ChatPanel({
     setConversationId(convoId);
   }, [convoId, setConversationId]);
 
-  /** When commentator produces a refined prompt, inject it into the chat input */
+  /** When a refined prompt is set (user clicked "Use in chat"), inject it into the chat input.
+   *  Workshop messages are kept visible in the panel for context.
+   *  Mode stays as-is — no auto-switching to freestyle. */
   useEffect(() => {
     if (refinedPrompt && chatInputRef.current) {
       chatInputRef.current.setInput(refinedPrompt);
       clearRefinedPrompt();
-      /* Clear workshop messages and return commentator to dormant state */
-      clearActiveConversation();
+      /* Don't clear workshop messages — user can scroll back for context.
+         Don't switch mode — 0→1 stays as 0→1. workshopComplete flag
+         ensures handleSend routes to main chat, not back to workshop. */
     }
-  }, [refinedPrompt, clearRefinedPrompt, clearActiveConversation]);
+  }, [refinedPrompt, clearRefinedPrompt]);
 
   /** Handle sending a message — creates conversation if needed, streams response */
   const handleSend = useCallback(async (message: string) => {
-    /* In 0→1 mode, route to workshop — sendToWorkshop handles its own
-       conversation creation, so we skip it here to avoid a race condition
-       where React state hasn't synced the new conversation ID yet. */
-    if (mode === "zero_to_one") {
+    /* In 0→1 mode before workshop completes, route to workshop.
+       After workshop is done (workshopComplete), messages go to normal main chat
+       even though we're still in 0→1 dark theme. */
+    if (mode === "zero_to_one" && !workshopComplete) {
       sendToWorkshop(message);
       return;
     }
@@ -205,7 +209,7 @@ export function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [convoId, mode, clearNudges, runPromptAnalysis, runResponseAnalysis, messages]);
+  }, [convoId, mode, workshopComplete, clearNudges, runPromptAnalysis, runResponseAnalysis, messages]);
 
   return (
     <div style={{
@@ -216,9 +220,23 @@ export function ChatPanel({
       {/* ===== MESSAGE AREA =====
           Scrollable container for messages or welcome screen */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto" }}>
-        {/* In 0→1 mode with active workshop, show a minimal placeholder instead of welcome screen */}
-        {messages.length === 0 && mode === "zero_to_one" && activeMessages.length > 0 ? (
+        {/* In 0→1 mode with active workshop (not yet complete), show dimmed placeholder */}
+        {messages.length === 0 && mode === "zero_to_one" && activeMessages.length > 0 && !workshopComplete ? (
           <WorkshopPlaceholder theme={theme} />
+        ) : messages.length === 0 && workshopComplete ? (
+          /* Clean empty state after workshop — just a hint, no welcome screen */
+          <div style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 48,
+          }}>
+            <p style={{
+              fontSize: 14, color: theme.textTertiary,
+              textAlign: "center", lineHeight: 1.6,
+              maxWidth: 340,
+            }}>
+              Review your refined prompt below, edit if needed, and send.
+            </p>
+          </div>
         ) : messages.length === 0 ? (
           /* Show welcome screen when no messages */
           <WelcomeScreen onSelectPrompt={handleSend} />
@@ -248,27 +266,84 @@ export function ChatPanel({
   );
 }
 
-/** Minimal placeholder shown in the main area while 0→1 workshop is active in the panel */
+/** Workshop status phrases — rotate while the commentator refines the prompt.
+ *  Apple setup-screen inspired: calm, purposeful, one phrase at a time. */
+const WORKSHOP_PHRASES = [
+  "Refining your prompt",
+  "Sharpening the details",
+  "Crafting something better",
+  "Almost there",
+];
+
+/** Apple-style placeholder shown in the dimmed main area during 0→1 workshop.
+ *  Features: subtle dim overlay, sparkle icon, rotating status text with shimmer gradient. */
 function WorkshopPlaceholder({ theme }: { theme: ReturnType<typeof useTheme>["theme"] }) {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+
+  /* Rotate through phrases every 4 seconds */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % WORKSHOP_PHRASES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div style={{
       flex: 1, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      padding: "24px", gap: 12,
+      position: "relative",
+      minHeight: "100%",
     }}>
-      {/* Sparkle icon */}
-      <div style={{ color: theme.accent, opacity: 0.5 }}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+      {/* Dim overlay — pushes visual focus to the red panel */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "rgba(0, 0, 0, 0.4)",
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(2px)",
+      }} />
+
+      {/* Centered content */}
+      <div style={{
+        position: "relative", zIndex: 1,
+        display: "flex", flexDirection: "column",
+        alignItems: "center", gap: 16,
+      }}>
+        {/* Sparkle icon with gentle pulse */}
+        <div style={{
+          color: theme.accent, opacity: 0.6,
+          animation: "thinking-sparkle 3s ease-in-out infinite",
+        }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+          </svg>
+        </div>
+
+        {/* Rotating status text with shimmer gradient — Apple setup screen feel */}
+        <div
+          key={phraseIndex}
+          style={{
+            fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em",
+            textAlign: "center", lineHeight: 1.6,
+            /* Shimmer gradient text effect */
+            background: "linear-gradient(90deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0.4) 100%)",
+            backgroundSize: "200% 100%",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            animation: "shimmer-text 2.5s ease-in-out infinite, thinking-fade 4s ease-in-out",
+          }}
+        >
+          {WORKSHOP_PHRASES[phraseIndex]}
+        </div>
+
+        {/* Subtle arrow pointing right */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
       </div>
-      <p style={{
-        fontSize: 14, color: theme.textSecondary,
-        textAlign: "center", maxWidth: 280, lineHeight: 1.6,
-      }}>
-        Refining your prompt in The Commentator panel →
-      </p>
     </div>
   );
 }

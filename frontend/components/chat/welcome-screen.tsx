@@ -1,24 +1,39 @@
 /**
  * Welcome Screen — shown before the first message.
  *
- * Layout:
- * - Sparkle icon (brand mark)
- * - "Change how you work with AI" headline
- * - Freestyle / 0→1 mode toggle (centered, pill-shaped)
- * - Subtitle that changes with mode
- * - Example prompt cards
+ * The user picks their path here:
+ * - Freestyle: open-ended chat, commentator watches
+ * - 0→1: back-and-forth with commentator to shape a prompt
  *
- * The toggle is centered here on the welcome screen.
- * Once conversation starts, the toggle moves near the commentator panel.
+ * Features a rotating subtitle with shimmer effect that changes
+ * with the selected mode. Once a prompt is sent, welcome disappears.
  *
  * Theme-aware: responds to Freestyle (light) / 0→1 (dark) mode.
  */
 "use client";
 
+import { useState, useEffect } from "react";
 import { useTheme } from "@/lib/theme-context";
 
 /* ========================================
-   Example prompts — shown as clickable cards
+   Rotating subtitle phrases per mode
+   ======================================== */
+const FREESTYLE_PHRASES = [
+  "Explore freely and brainstorm without limits",
+  "Ask anything — The Commentator watches and learns",
+  "Your ideas, amplified by observation",
+  "Think out loud — insights come as you go",
+];
+
+const ZERO_TO_ONE_PHRASES = [
+  "Shape your idea into a sharp prompt",
+  "A conversation before the conversation",
+  "From rough thought to precise intent",
+  "Talk it through — then send it out",
+];
+
+/* ========================================
+   Example prompts — shown as clickable cards (Freestyle only)
    ======================================== */
 const EXAMPLE_PROMPTS = [
   { label: "Write a business email", prompt: "Help me write an email to my team about the project update" },
@@ -33,6 +48,17 @@ interface WelcomeScreenProps {
 
 export function WelcomeScreen({ onSelectPrompt }: WelcomeScreenProps) {
   const { mode, setMode, theme } = useTheme();
+  const phrases = mode === "freestyle" ? FREESTYLE_PHRASES : ZERO_TO_ONE_PHRASES;
+  const [phraseIndex, setPhraseIndex] = useState(0);
+
+  /* Rotate subtitle phrases every 3.5 seconds */
+  useEffect(() => {
+    setPhraseIndex(0);
+    const interval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % phrases.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [mode, phrases.length]);
 
   return (
     <div style={{
@@ -40,16 +66,63 @@ export function WelcomeScreen({ onSelectPrompt }: WelcomeScreenProps) {
       alignItems: "center", justifyContent: "center",
       padding: "24px 24px 48px",
     }}>
+      {/* ===== SPARKLE ICON ===== */}
+      <div style={{ marginBottom: 24, color: theme.accent }}>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+          <path d="M19 1L19.5 3L21 3.5L19.5 4L19 6L18.5 4L17 3.5L18.5 3L19 1Z" opacity="0.5" />
+        </svg>
+      </div>
+
+      {/* ===== HEADLINE ===== */}
+      <h1 style={{
+        fontSize: 28, fontWeight: 600, color: theme.text,
+        letterSpacing: "-0.03em", marginBottom: 16,
+        textAlign: "center",
+      }}>
+        Averroes
+      </h1>
+
+      {/* ===== ROTATING SUBTITLE with shimmer =====
+          Changes when mode switches + rotates on a timer */}
+      <div style={{
+        height: 28, marginBottom: 28,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        overflow: "hidden",
+      }}>
+        <p
+          key={`${mode}-${phraseIndex}`}
+          style={{
+            fontSize: 15, fontWeight: 500,
+            letterSpacing: "-0.01em",
+            textAlign: "center",
+            maxWidth: 420, lineHeight: 1.6,
+            /* Shimmer gradient text effect */
+            background: mode === "freestyle"
+              ? `linear-gradient(90deg, ${theme.textSecondary} 0%, ${theme.accent} 50%, ${theme.textSecondary} 100%)`
+              : `linear-gradient(90deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.5) 100%)`,
+            backgroundSize: "200% 100%",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            animation: "shimmer-text 3s ease-in-out infinite, thinking-fade 3.5s ease-in-out",
+          }}
+        >
+          {phrases[phraseIndex]}
+        </p>
+      </div>
+
       {/* ===== MODE TOGGLE =====
-          Centered pill-shaped segmented control: Freestyle | 0→1
-          Styled like the ChatGPT model selector */}
+          Path picker — choose your approach before starting.
+          Disappears once the first message is sent. */}
       <div style={{
         display: "flex", gap: 2, padding: 3,
         background: mode === "freestyle"
           ? "rgba(0, 0, 0, 0.05)"
           : "rgba(255, 255, 255, 0.08)",
         borderRadius: 14,
-        marginBottom: 48,
+        marginBottom: 44,
       }}>
         <button
           onClick={() => setMode("freestyle")}
@@ -81,73 +154,54 @@ export function WelcomeScreen({ onSelectPrompt }: WelcomeScreenProps) {
         </button>
       </div>
 
-      {/* ===== SPARKLE ICON =====
-          Brand mark — matches the Figma reference */}
-      <div style={{ marginBottom: 20, color: theme.accent }}>
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Four-point star / sparkle */}
-          <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
-          {/* Small decorative sparkle */}
-          <path d="M19 1L19.5 3L21 3.5L19.5 4L19 6L18.5 4L17 3.5L18.5 3L19 1Z" opacity="0.5" />
-        </svg>
-      </div>
+      {/* ===== EXAMPLE PROMPT CARDS (Freestyle only) ===== */}
+      {mode === "freestyle" && (
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr",
+          gap: 10, maxWidth: 480, width: "100%",
+        }}>
+          {EXAMPLE_PROMPTS.map((ex) => (
+            <button
+              key={ex.label}
+              onClick={() => onSelectPrompt?.(ex.prompt)}
+              style={{
+                padding: "14px 16px", borderRadius: 12,
+                border: `1px solid ${theme.border}`,
+                background: "#fff",
+                textAlign: "left", cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = theme.accentMuted;
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = theme.border;
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 500, color: theme.text, marginBottom: 4 }}>
+                {ex.label}
+              </div>
+              <div style={{ fontSize: 12, color: theme.textTertiary, lineHeight: 1.4 }}>
+                {ex.prompt}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* ===== HEADLINE ===== */}
-      <h1 style={{
-        fontSize: 28, fontWeight: 600, color: theme.text,
-        letterSpacing: "-0.03em", marginBottom: 12,
-        textAlign: "center",
-      }}>
-        Change how you work with AI
-      </h1>
-
-      {/* ===== SUBTITLE =====
-          Changes based on mode to explain what the user is about to do */}
-      <p style={{
-        fontSize: 14, color: theme.textSecondary,
-        marginBottom: 44, textAlign: "center",
-        maxWidth: 380, lineHeight: 1.6,
-      }}>
-        {mode === "freestyle"
-          ? "Explore freely and brainstorm without limits"
-          : "Switch to 0 → 1 mode for rapid, goal-driven execution"}
-      </p>
-
-      {/* ===== EXAMPLE PROMPT CARDS ===== */}
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr",
-        gap: 10, maxWidth: 480, width: "100%",
-      }}>
-        {EXAMPLE_PROMPTS.map((ex) => (
-          <button
-            key={ex.label}
-            onClick={() => onSelectPrompt?.(ex.prompt)}
-            style={{
-              padding: "14px 16px", borderRadius: 12,
-              border: `1px solid ${theme.border}`,
-              background: mode === "freestyle" ? "#fff" : theme.bgSecondary,
-              textAlign: "left", cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = theme.accentMuted;
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = theme.border;
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 500, color: theme.text, marginBottom: 4 }}>
-              {ex.label}
-            </div>
-            <div style={{ fontSize: 12, color: theme.textTertiary, lineHeight: 1.4 }}>
-              {ex.prompt}
-            </div>
-          </button>
-        ))}
-      </div>
+      {/* ===== 0→1 HINT =====
+          In 0→1, the conversation happens in the panel */}
+      {mode === "zero_to_one" && (
+        <p style={{
+          fontSize: 13, color: theme.textTertiary,
+          textAlign: "center", lineHeight: 1.6,
+          maxWidth: 340,
+        }}>
+          Type your idea below — The Commentator will ask you a few questions, then craft a prompt you can send to the AI.
+        </p>
+      )}
     </div>
   );
 }

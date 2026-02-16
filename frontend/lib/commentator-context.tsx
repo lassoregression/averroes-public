@@ -3,10 +3,11 @@
  *
  * Bridges the gap between the chat (page-level) and commentator panel (layout-level)
  * by providing shared state and handlers for:
- * - Nudges from the heuristic engine
+ * - Auto-triggered prompt suggestions after each chat exchange
  * - Active coaching conversation (messages + streaming)
  * - "Use refined prompt" flow (commentator → chat input)
  * - Conversation ID tracking (so commentator knows which convo to coach)
+ * - Workshop mode (0→1) for guided prompt refinement
  */
 "use client";
 
@@ -61,6 +62,13 @@ interface CommentatorContextValue {
   /** Set a refined prompt (from commentator → chat input) */
   setRefinedPrompt: (prompt: string) => void;
 
+  /** Workshop-extracted prompt — displayed as card, NOT auto-injected.
+   *  User must click "Use in chat" to move it to refinedPrompt → chat input. */
+  workshopPrompt: string | null;
+
+  /** Whether the workshop has completed (prompt card shown, waiting for user action) */
+  workshopComplete: boolean;
+
   /**
    * Run nudge analysis on a user prompt (before sending).
    * Returns the nudges so the caller can also use them if needed.
@@ -72,7 +80,7 @@ interface CommentatorContextValue {
 
   /**
    * Run post-response analysis (after LLM responds).
-   * Appends any new nudges to existing ones.
+   * Also auto-triggers the commentator to generate a prompt suggestion.
    */
   runResponseAnalysis: (prompt: string, response: string) => void;
 
@@ -113,6 +121,10 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
   const [isCommentatorStreaming, setIsCommentatorStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
+  /* Workshop-extracted prompt — shown as prompt card, user must click "Use in chat" to inject */
+  const [workshopPrompt, setWorkshopPrompt] = useState<string | null>(null);
+  /* Whether the workshop flow has completed (prompt delivered, ready for main chat) */
+  const [workshopComplete, setWorkshopComplete] = useState(false);
 
   /* Ref to track the latest conversation ID in async callbacks */
   const convoIdRef = useRef<string | null>(null);
@@ -131,22 +143,93 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
     [setCommentatorState],
   );
 
-  /** Analyze an LLM response — replaces pre-prompt nudges with post-response observations */
-  const runResponseAnalysis = useCallback(
-    (prompt: string, response: string) => {
-      const result = analyzeResponse(prompt, response);
-      if (result.shouldNudge) {
-        /* Replace pre-prompt nudges entirely — post-response observations
-           are more relevant since they're about the actual exchange */
-        setNudges(result.nudges);
-        setCommentatorState("nudging");
+  /**
+   * Auto-trigger the commentator after each chat exchange.
+   * Calls the backend /coach/respond endpoint which sends the full conversation
+   * context to the LLM. The commentator generates a brief observation + a refined
+   * prompt suggestion displayed as a prompt card in the panel.
+   */
+  const autoTriggerCommentator = useCallback(
+    async (userPrompt: string) => {
+      const cId = convoIdRef.current;
+      if (!cId) return;
+
+      /* Clear previous commentator messages — each exchange gets a fresh observation */
+      setActiveMessages([]);
+      setNudges([]);
+
+      /* Add empty commentator message for streaming */
+      const commentatorId = `auto-coach-${Date.now()}`;
+      const commentatorMsg: CommentatorMessage = {
+        id: commentatorId,
+        type: "commentator",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      };
+
+      setActiveMessages([commentatorMsg]);
+      setIsCommentatorStreaming(true);
+      setCommentatorState("active");
+
+      try {
+        for await (const event of streamCoach(cId, userPrompt, "auto")) {
+          if (event.type === "chunk" && event.content) {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId
+                  ? { ...m, content: m.content + event.content }
+                  : m,
+              ),
+            );
+          } else if (event.type === "done") {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId ? { ...m, isStreaming: false } : m,
+              ),
+            );
+          } else if (event.type === "error") {
+            setActiveMessages((prev) =>
+              prev.map((m) =>
+                m.id === commentatorId
+                  ? { ...m, content: event.message || "Something went wrong.", isStreaming: false }
+                  : m,
+              ),
+            );
+          }
+        }
+      } catch {
+        /* Commentator failure shouldn't break the main chat — fail silently */
+        setActiveMessages((prev) =>
+          prev.map((m) =>
+            m.id === commentatorId
+              ? { ...m, content: "", isStreaming: false }
+              : m,
+          ),
+        );
+      } finally {
+        setIsCommentatorStreaming(false);
       }
-      /* If no post-response nudges, keep pre-prompt ones visible */
     },
     [setCommentatorState],
   );
 
-  /** Send a message to the commentator for active coaching */
+  /** Analyze an LLM response and auto-trigger commentator for prompt suggestion */
+  const runResponseAnalysis = useCallback(
+    (prompt: string, response: string) => {
+      /* Run heuristic nudges (zero cost) */
+      const result = analyzeResponse(prompt, response);
+      if (result.shouldNudge) {
+        setNudges(result.nudges);
+      }
+
+      /* Auto-trigger the commentator to generate a prompt suggestion (LLM call) */
+      autoTriggerCommentator(prompt);
+    },
+    [autoTriggerCommentator],
+  );
+
+  /** Send a message to the commentator for active coaching (user-initiated) */
   const sendToCommentator = useCallback(
     async (message: string) => {
       const cId = convoIdRef.current;
@@ -273,7 +356,9 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
               ),
             );
 
-            /* If workshop says prompt is ready, extract the refined prompt from delimiters */
+            /* If workshop says prompt is ready, extract and store as workshopPrompt.
+               User must click "Use in chat" to inject into main chat input.
+               Mode stays in 0→1 — no auto-switching. */
             if (event.workshop_ready) {
               setActiveMessages((prev) => {
                 const finalMsg = prev.find((m) => m.id === commentatorId);
@@ -283,9 +368,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
                   const extracted = promptMatch
                     ? promptMatch[1].trim()
                     : finalMsg.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
-                  setRefinedPrompt(extracted);
-                  /* Switch back to Freestyle mode */
-                  setMode("freestyle");
+                  setWorkshopPrompt(extracted);
+                  setWorkshopComplete(true);
                 }
                 return prev;
               });
@@ -315,7 +399,7 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
         setIsCommentatorStreaming(false);
       }
     },
-    [setCommentatorState, setConversationId, setRefinedPrompt, setMode],
+    [setCommentatorState, setConversationId],
   );
 
   const clearNudges = useCallback(() => {
@@ -326,6 +410,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
   const clearActiveConversation = useCallback(() => {
     setActiveMessages([]);
     setIsCommentatorStreaming(false);
+    setWorkshopPrompt(null);
+    setWorkshopComplete(false);
     setCommentatorState("dormant");
   }, [setCommentatorState]);
 
@@ -344,6 +430,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
         refinedPrompt,
         clearRefinedPrompt,
         setRefinedPrompt,
+        workshopPrompt,
+        workshopComplete,
         runPromptAnalysis,
         runResponseAnalysis,
         sendToCommentator,

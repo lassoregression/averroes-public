@@ -8,9 +8,24 @@
  */
 "use client";
 
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTheme } from "@/lib/theme-context";
+
+/** Pool of thinking-related words — rotates randomly while waiting for first token */
+const THINKING_WORDS = [
+  "Thinking",
+  "Pondering",
+  "Mulling",
+  "Considering",
+  "Reflecting",
+  "Reasoning",
+  "Analyzing",
+  "Processing",
+  "Deliberating",
+  "Contemplating",
+];
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
@@ -42,7 +57,8 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
       {/* Message content */}
       <div style={{
         maxWidth: "75%",
-        padding: isUser ? "10px 16px" : "12px 16px",
+        /* Compact padding when showing thinking indicator (no content yet) */
+        padding: (!isUser && isStreaming && !content) ? "8px 14px" : (isUser ? "10px 16px" : "12px 16px"),
         ...(isUser ? {
           background: mode === "freestyle" ? "#f0f0f2" : "rgba(255,255,255,0.08)",
           borderRadius: "20px 20px 4px 20px",
@@ -115,7 +131,7 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
                             fontSize: 13, lineHeight: 1.5,
                             border: `1px solid ${mode === "freestyle" ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)"}`,
                           }}>
-                            <code style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{children}</code>
+                            <code style={{ fontFamily: "var(--font-geist-mono), 'SF Mono', 'Fira Code', monospace" }}>{children}</code>
                           </pre>
                         );
                       }
@@ -123,7 +139,7 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
                         <code style={{
                           background: mode === "freestyle" ? "#f0f0f2" : "rgba(255,255,255,0.08)",
                           padding: "1px 5px", borderRadius: 4,
-                          fontSize: 13, fontFamily: "'SF Mono', 'Fira Code', monospace",
+                          fontSize: 13, fontFamily: "var(--font-geist-mono), 'SF Mono', 'Fira Code', monospace",
                         }}>
                           {children}
                         </code>
@@ -166,11 +182,13 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
                 </ReactMarkdown>
               )
             ) : (
-              isStreaming ? "" : "..."
+              isStreaming ? <ThinkingIndicator theme={theme} /> : "..."
             )}
           </div>
         )}
       </div>
+
+      {/* (thinking animation styles are now inside ThinkingIndicator component) */}
 
       {/* User avatar */}
       {isUser && (
@@ -183,6 +201,58 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
           U
         </div>
       )}
+    </div>
+  );
+}
+
+/** Animated thinking indicator — small sparkle symbol + rotating thinking words, Claude-style */
+export function ThinkingIndicator({ theme, variant = "chat" }: {
+  theme: ReturnType<typeof useTheme>["theme"];
+  variant?: "chat" | "commentator";
+}) {
+  const [wordIndex, setWordIndex] = useState(() =>
+    Math.floor(Math.random() * THINKING_WORDS.length)
+  );
+
+  /* Rotate to a new random word every 3 seconds */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWordIndex((prev) => {
+        let next: number;
+        do { next = Math.floor(Math.random() * THINKING_WORDS.length); } while (next === prev);
+        return next;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isCommentator = variant === "commentator";
+  const textColor = isCommentator ? "rgba(255, 255, 255, 0.6)" : theme.textTertiary;
+  const sparkleColor = isCommentator ? "rgba(255, 255, 255, 0.5)" : theme.accent;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 7, padding: "2px 0",
+    }}>
+      {/* Tiny sparkle symbol — pulses gently (keyframes in globals.css) */}
+      <svg
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke={sparkleColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ animation: "thinking-sparkle 2s ease-in-out infinite", flexShrink: 0 }}
+      >
+        <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+      </svg>
+      {/* Rotating thinking word */}
+      <span
+        key={wordIndex}
+        style={{
+          fontSize: 13, fontWeight: 500, color: textColor,
+          letterSpacing: "-0.01em",
+          animation: "thinking-fade 3s ease-in-out",
+        }}
+      >
+        {THINKING_WORDS[wordIndex]}...
+      </span>
     </div>
   );
 }

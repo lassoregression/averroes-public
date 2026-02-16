@@ -3,7 +3,7 @@
  *
  * This is the top-level layout that wraps every page.
  * It sets up:
- * - Inter font (the primary typeface — clean, professional, matches Linear)
+ * - Geist Sans/Mono fonts (the primary typeface — clean, professional, matches Linear)
  * - Global CSS variables and Tailwind styles
  * - HTML metadata (title, description, favicon)
  *
