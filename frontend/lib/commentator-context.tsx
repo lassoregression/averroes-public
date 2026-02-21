@@ -19,7 +19,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { analyzePrompt, analyzeResponse, type Nudge } from "@/lib/nudge-engine";
+import type { Nudge } from "@/lib/nudge-engine";
 import { streamCoach, streamWorkshop, createConversation } from "@/lib/api";
 import { useTheme } from "@/lib/theme-context";
 
@@ -69,25 +69,23 @@ interface CommentatorContextValue {
   /** Whether the workshop has completed (prompt card shown, waiting for user action) */
   workshopComplete: boolean;
 
-  /**
-   * Run nudge analysis on a user prompt (before sending).
-   * Returns the nudges so the caller can also use them if needed.
-   */
-  runPromptAnalysis: (
-    prompt: string,
-    conversationHistory: Array<{ role: string; content: string }>,
-  ) => Nudge[];
+  /** True from when user sends a message until the auto-commentator starts streaming.
+   *  Used to show the "Pondering..." shimmer while the main chat is still responding. */
+  isPendingCommentary: boolean;
+
+  /** Signal that commentary is incoming — shows shimmer in the panel immediately. */
+  signalPendingCommentary: () => void;
 
   /**
    * Run post-response analysis (after LLM responds).
-   * Also auto-triggers the commentator to generate a prompt suggestion.
+   * Auto-triggers the commentator to generate a prompt suggestion.
    */
   runResponseAnalysis: (prompt: string, response: string) => void;
 
   /** Send a message to the commentator (Active coaching) */
   sendToCommentator: (message: string) => Promise<void>;
 
-  /** Clear all nudges (e.g. when starting a new exchange) */
+  /** Clear all nudges (e.g. when starting a new conversation) */
   clearNudges: () => void;
 
   /** Clear the active conversation */
@@ -119,6 +117,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [activeMessages, setActiveMessages] = useState<CommentatorMessage[]>([]);
   const [isCommentatorStreaming, setIsCommentatorStreaming] = useState(false);
+  /* True from message send until auto-commentator starts — drives the panel shimmer */
+  const [isPendingCommentary, setIsPendingCommentary] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [refinedPrompt, setRefinedPrompt] = useState<string | null>(null);
   /* Workshop-extracted prompt — shown as prompt card, user must click "Use in chat" to inject */
@@ -130,18 +130,12 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
   const convoIdRef = useRef<string | null>(null);
   convoIdRef.current = conversationId;
 
-  /** Analyze a prompt before sending — returns nudges and updates state */
-  const runPromptAnalysis = useCallback(
-    (prompt: string, conversationHistory: Array<{ role: string; content: string }>) => {
-      const result = analyzePrompt(prompt, conversationHistory);
-      if (result.shouldNudge) {
-        setNudges(result.nudges);
-        setCommentatorState("nudging");
-      }
-      return result.nudges;
-    },
-    [setCommentatorState],
-  );
+  /** Signal that commentary is incoming — shows the panel shimmer immediately.
+   *  Called when the user sends a message, before the main chat even responds. */
+  const signalPendingCommentary = useCallback(() => {
+    setIsPendingCommentary(true);
+    setCommentatorState("active");
+  }, [setCommentatorState]);
 
   /**
    * Auto-trigger the commentator after each chat exchange.
@@ -154,7 +148,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
       const cId = convoIdRef.current;
       if (!cId) return;
 
-      /* Clear previous commentator messages — each exchange gets a fresh observation */
+      /* Clear pending shimmer and previous messages — fresh observation for each exchange */
+      setIsPendingCommentary(false);
       setActiveMessages([]);
       setNudges([]);
 
@@ -214,16 +209,13 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
     [setCommentatorState],
   );
 
-  /** Analyze an LLM response and auto-trigger commentator for prompt suggestion */
+  /** Analyze an LLM response and auto-trigger commentator for prompt suggestion.
+   *  We skip setting heuristic nudges here because autoTriggerCommentator immediately
+   *  clears them anyway — setting then clearing causes a distracting flash. */
   const runResponseAnalysis = useCallback(
-    (prompt: string, response: string) => {
-      /* Run heuristic nudges (zero cost) */
-      const result = analyzeResponse(prompt, response);
-      if (result.shouldNudge) {
-        setNudges(result.nudges);
-      }
-
-      /* Auto-trigger the commentator to generate a prompt suggestion (LLM call) */
+    (prompt: string, _response: string) => {
+      /* Auto-trigger the commentator to generate a prompt suggestion (LLM call).
+         This clears nudges and replaces them with a shimmer → streaming commentary. */
       autoTriggerCommentator(prompt);
     },
     [autoTriggerCommentator],
@@ -410,6 +402,7 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
   const clearActiveConversation = useCallback(() => {
     setActiveMessages([]);
     setIsCommentatorStreaming(false);
+    setIsPendingCommentary(false);
     setWorkshopPrompt(null);
     setWorkshopComplete(false);
     setCommentatorState("dormant");
@@ -432,7 +425,8 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
         setRefinedPrompt,
         workshopPrompt,
         workshopComplete,
-        runPromptAnalysis,
+        isPendingCommentary,
+        signalPendingCommentary,
         runResponseAnalysis,
         sendToCommentator,
         clearNudges,

@@ -27,12 +27,15 @@ export function CommentatorPanel() {
     nudges,
     activeMessages,
     isCommentatorStreaming,
+    isPendingCommentary,
     sendToCommentator,
     sendToWorkshop,
     setRefinedPrompt,
     workshopComplete,
   } = useCommentator();
   const [inputValue, setInputValue] = useState("");
+  /* Tracks whether user clicked "Talk to Commentator" — shows the input field */
+  const [isEngaged, setIsEngaged] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -54,6 +57,13 @@ export function CommentatorPanel() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [feed.length, activeMessages]);
+
+  /** Reset engaged state when conversation clears (e.g. new conversation) */
+  useEffect(() => {
+    if (activeMessages.length === 0 && nudges.length === 0) {
+      setIsEngaged(false);
+    }
+  }, [activeMessages.length, nudges.length]);
 
   /** Handle clicking a nudge — activates the commentator with nudge as context */
   const handleNudgeClick = useCallback((clickedNudge: Nudge) => {
@@ -100,9 +110,9 @@ export function CommentatorPanel() {
 
   /* Determine if the input area should show:
      - 0→1 mode: ALWAYS show input (text conversation feel)
-     - Freestyle: show when user has explicitly engaged (sent a message in panel) */
+     - Freestyle: show when user has explicitly engaged (clicked button or sent a message) */
   const hasUserEngaged = activeMessages.some(m => m.type === "user");
-  const showInput = mode === "zero_to_one" || hasUserEngaged;
+  const showInput = mode === "zero_to_one" || hasUserEngaged || isEngaged;
 
   return (
     <div
@@ -178,21 +188,37 @@ export function CommentatorPanel() {
           gap: 10,
         }}
       >
-        {/* Dormant state — sparkle icon + idle message */}
-        {feed.length === 0 && commentatorState === "dormant" && (
+        {/* Dormant state — idle message. Hidden while pending (shimmer covers it). */}
+        {feed.length === 0 && commentatorState === "dormant" && !isPendingCommentary && (
           <DormantState isWorkshop={mode === "zero_to_one"} />
         )}
 
-        {/* Render each feed item */}
-        {feed.map((msg) => (
-          <FeedItem
-            key={msg.id}
-            message={msg}
-            onNudgeClick={handleNudgeClick}
-            onUsePrompt={handleUsePrompt}
-            isStreaming={msg.isStreaming}
-          />
-        ))}
+        {/* Thinking shimmer — shown from the moment the user sends a message until
+            the commentator has produced its first token. Two cases:
+            1. isPendingCommentary: main chat still streaming, commentator not started yet
+            2. Streaming with empty content: commentator started but no tokens yet */}
+        {(isPendingCommentary ||
+          (isCommentatorStreaming &&
+            activeMessages.length > 0 &&
+            activeMessages[activeMessages.length - 1].type === "commentator" &&
+            activeMessages[activeMessages.length - 1].content === "")) && (
+          <PanelThinkingState />
+        )}
+
+        {/* Render each feed item (skip empty streaming commentator messages — shimmer handles those) */}
+        {feed.map((msg) => {
+          /* Hide empty streaming commentator messages — PanelThinkingState covers this state */
+          if (msg.type === "commentator" && msg.isStreaming && msg.content === "") return null;
+          return (
+            <FeedItem
+              key={msg.id}
+              message={msg}
+              onNudgeClick={handleNudgeClick}
+              onUsePrompt={handleUsePrompt}
+              isStreaming={msg.isStreaming}
+            />
+          );
+        })}
       </div>
 
       {/* ===== INPUT AREA =====
@@ -271,6 +297,7 @@ export function CommentatorPanel() {
           <button
             onClick={() => {
               setCommentatorState("active");
+              setIsEngaged(true);
               setTimeout(() => inputRef.current?.focus(), 100);
             }}
             style={{
@@ -337,6 +364,47 @@ function DormantState({ isWorkshop }: { isWorkshop: boolean }) {
         {isWorkshop
           ? "Tell me what you're thinking — we'll shape it into something sharp."
           : "I'll comment on your conversation as it unfolds."}
+      </span>
+    </div>
+  );
+}
+
+/** Thinking shimmer — shown while waiting for the first commentator token.
+ *  Rotating words with a shimmer gradient, similar to the workshop placeholder effect. */
+function PanelThinkingState() {
+  const words = ["Pondering...", "Reflecting...", "Thinking...", "Considering..."];
+  const [wordIndex, setWordIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWordIndex((prev) => (prev + 1) % words.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [words.length]);
+
+  return (
+    <div className="animate-fade-in" style={{
+      display: "flex", alignItems: "center", gap: 8,
+      padding: "12px 14px",
+    }}>
+      {/* Pulsing sparkle icon */}
+      <span style={{
+        fontSize: 16, opacity: 0.7,
+        animation: "pulse 2s ease-in-out infinite",
+      }}>
+        ✦
+      </span>
+      {/* Rotating word with shimmer effect */}
+      <span
+        className="shimmer-text"
+        style={{
+          fontSize: 13, fontWeight: 500,
+          color: "rgba(255, 255, 255, 0.6)",
+          letterSpacing: "-0.01em",
+          transition: "opacity 0.3s ease",
+        }}
+      >
+        {words[wordIndex]}
       </span>
     </div>
   );

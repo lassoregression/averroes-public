@@ -43,13 +43,11 @@ export function ChatPanel({
   const { mode, theme } = useTheme();
   const {
     setConversationId,
-    runPromptAnalysis,
+    signalPendingCommentary,
     runResponseAnalysis,
-    clearNudges,
     refinedPrompt,
     clearRefinedPrompt,
     sendToWorkshop,
-    clearActiveConversation,
     activeMessages,
     workshopComplete,
   } = useCommentator();
@@ -137,10 +135,8 @@ export function ChatPanel({
       }
     }
 
-    /* Step 2b: Run nudge analysis on the prompt (zero cost, heuristic only) */
-    const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    clearNudges();
-    runPromptAnalysis(message, history);
+    /* Step 2b: Signal that commentary is incoming — shows shimmer in panel immediately */
+    signalPendingCommentary();
 
     /* Step 3: Add user message to UI immediately */
     const userMsg: ChatMessage = {
@@ -209,7 +205,7 @@ export function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [convoId, mode, workshopComplete, clearNudges, runPromptAnalysis, runResponseAnalysis, messages]);
+  }, [convoId, mode, workshopComplete, signalPendingCommentary, runResponseAnalysis, messages]);
 
   return (
     <div style={{
