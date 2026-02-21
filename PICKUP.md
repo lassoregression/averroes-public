@@ -26,6 +26,9 @@ Last session: 2026-02-21
 - Natural length (short when there's not much, longer when genuinely interesting).
 - No bullet/numbered list format, no "here's what I noticed" framing.
 
+#### ⚠️ App Broken — Details Pending
+User mentioned breaking the app during testing but the session ended before they could share the screenshots. **At the start of the next session, ask the user: "What did you break? You mentioned images — share them and we'll fix it."**
+
 #### Session Before (2026-02-15)
 ### What Was Changed This Session (2026-02-15)
 
