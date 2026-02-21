@@ -1,6 +1,6 @@
 # Averroes — Pickup File
 
-Last session: 2026-02-15
+Last session: 2026-02-21
 
 ## Current State
 
@@ -11,6 +11,22 @@ Last session: 2026-02-15
 - **Phase 4 (0→1 Workshop)**: Complete — workshop back-and-forth, `[WORKSHOP_READY]` signal, refined prompt card, persistent 0→1 mode
 - **Phase 5 (Sidebar)**: Complete — real conversation data, navigation, delete, titles, state clearing
 
+### What Was Changed This Session (2026-02-21)
+
+#### Commentator Panel — Shimmer from Send, No Pre-Response Nudges
+1. **Removed all pre-response heuristic nudge cards** (MISSING, TIP, etc.) in Freestyle. They appeared before the AI even responded and felt broken/template-y.
+2. **Shimmer shows from the moment user sends**: `signalPendingCommentary()` is called in `chat-panel.tsx` on send — sets `isPendingCommentary=true`, immediately shows "Pondering..." shimmer in the panel.
+3. **Continuous shimmer**: `isPendingCommentary` covers the gap while main chat is streaming. Once `autoTriggerCommentator` fires (after main chat done), it clears `isPendingCommentary` and the streaming empty-message state picks up the shimmer until first token arrives.
+4. **"Talk to Commentator" button fixed**: Added `isEngaged` local state. Button sets both `commentatorState="active"` AND `isEngaged=true`, which makes `showInput` true. Previously button clicked but input never appeared.
+5. **`runPromptAnalysis` removed entirely** from context, interface, and `chat-panel.tsx`. The heuristic nudge engine is still in `lib/nudge-engine.ts` but not called in Freestyle.
+
+#### Commentator Voice Rewrite
+- `COMMENTATOR_SYSTEM_PROMPT` rewritten: sharp intellectual peer, thinks out loud, direct opinions, no hedging.
+- Removed "choose ONE approach" rubric. Replaced with: react to the exchange honestly, say what you think.
+- Natural length (short when there's not much, longer when genuinely interesting).
+- No bullet/numbered list format, no "here's what I noticed" framing.
+
+#### Session Before (2026-02-15)
 ### What Was Changed This Session (2026-02-15)
 
 #### 0→1 Mode Redesign — Persistent Mode with User Control
@@ -75,8 +91,8 @@ Layout (app/(app)/layout.tsx)
 ```
 
 **Data flow:**
-- ChatPanel calls `runPromptAnalysis()` → nudges appear in CommentatorPanel
-- ChatPanel calls `runResponseAnalysis()` → auto-triggers commentator LLM call
+- ChatPanel calls `signalPendingCommentary()` on send → `isPendingCommentary=true` → shimmer shows in panel
+- ChatPanel calls `runResponseAnalysis()` → `autoTriggerCommentator()` → clears `isPendingCommentary` → streams commentator LLM response
 - User clicks nudge or "Talk to Commentator" → `sendToCommentator()` → streams from `/api/coach/respond`
 - In 0→1 mode (pre-workshop-complete), input routes to `sendToWorkshop()`
 - Workshop produces refined prompt → stored in `workshopPrompt` → prompt card shown → user clicks "Use in chat" → `setRefinedPrompt()` → ChatInput receives it
