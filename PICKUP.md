@@ -31,6 +31,46 @@ User mentioned breaking the app during testing but the session ended before they
 
 ---
 
+## 🗄️ Database Overview
+
+SQLite with 6 tables — all schema defined in `backend/app/models/database.py`:
+
+| Table | What it stores |
+|---|---|
+| `conversations` | Chat sessions — id, title, mode (regular/zero_to_one), user_id |
+| `messages` | Every chat message — role (user/assistant/system), content, conversation_id |
+| `coach_messages` | Every commentator response — coach_type (auto/manual/workshop), the response text, which user message triggered it. **Every auto-commentator response is already saved here with a `coach_message_id` sent in the SSE done event.** |
+| `ratings` | Thumbs up/down on a coach_message — linked by `coach_message_id`. Table ready, backend endpoint exists. |
+| `files` | Uploaded docs — extracted text, file type, size (Phase 6) |
+| `spaces` | Project folders / workspaces (Phase 7) |
+
+Plus FTS5 virtual tables on `conversations.title` and `messages.content` for full-text search.
+
+---
+
+## 🔜 Features to Discuss / Build Next
+
+### ⭐ Rate Coaching (Priority)
+**What**: Thumbs up / thumbs down on each commentator observation.
+**Why it matters**: Closes the feedback loop — we can see which observations landed and which didn't. Data for improving the prompt over time.
+**What's already built**:
+- `ratings` table in DB — `coach_message_id`, `rating` (+1/-1), optional `feedback` text
+- Backend endpoint: `POST /api/coach/rate` (in `backend/app/routers/coach.py`)
+- Frontend API function: `rateCoaching()` in `frontend/lib/api.ts`
+- The SSE stream already returns `coach_message_id` in the `done` event — we just need to store it and attach thumbs buttons
+- ⚠️ Bug: the `/rate` endpoint has a TODO — `conversation_id=""` is hardcoded, needs to be resolved from the coach_message record. Fix this when building the UI.
+**What's needed**: Thumbs up/down buttons on each commentator message bubble in the panel. Store the `coach_message_id` from the SSE done event and pass it on rating.
+
+### 📋 Get Coach Messages (Discuss)
+**What**: `GET /api/coach/{conversation_id}/messages` — fetches all commentator observations for a past conversation.
+**Use cases to decide between**:
+1. **History view**: When you open an old conversation, the panel could replay what The Commentator said at each step
+2. **Analytics feed**: A separate "coaching history" view across all conversations
+3. **Skip it for now**: The panel already shows the latest observation; past ones aren't accessible but the data is there if we want it later
+**Status**: Backend endpoint fully built. Frontend `getCoachMessages()` in `api.ts` is ready. No UI yet. Need to decide if/how to surface this.
+
+---
+
 ## 0→1 Workshop Flow (Current Design)
 
 1. User switches to 0→1 mode (toggle on **welcome screen**)
