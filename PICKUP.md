@@ -1,6 +1,6 @@
 # Averroes — Pickup File
 
-Last session: 2026-02-21
+Last session: 2026-03-01
 
 ## Current State
 
@@ -26,8 +26,37 @@ Last session: 2026-02-21
 - Natural length (short when there's not much, longer when genuinely interesting).
 - No bullet/numbered list format, no "here's what I noticed" framing.
 
-#### ⚠️ App Broken — Details Pending
-User mentioned breaking the app during testing but the session ended before they could share the screenshots. **At the start of the next session, ask the user: "What did you break? You mentioned images — share them and we'll fix it."**
+#### Duplicate "REFINED PROMPT" Label — FIXED (2026-03-01)
+- **Issue**: Model outputs `REFINED PROMPT` as a text label before the `---PROMPT---` delimiters. Frontend strips the delimiter block into the card but left the label sitting in the commentary — showing it twice (once in bold text, once as the card header).
+- **Fix**: `commentator-panel.tsx` — added `.replace(/\*{0,2}REFINED PROMPT\*{0,2}\s*$/i, "")` after stripping the delimiter block. Catches plain, bold (`**...**`), and any case variant. Commentary now ends cleanly before the card.
+
+#### Commentator Full Context ("The Mind") — IMPLEMENTED (2026-03-01)
+- **What changed**: Commentator now receives its own prior outputs as context, not just the main chat history.
+- **`prompts/coach.py`**: Added `commentator_messages` param to `build_coach_prompt()`. New `_build_commentator_history()` helper formats prior auto + manual coach outputs as `<commentator_history>` XML block — distinct from `<conversation_context>` so the model knows its own voice vs. the main chat's.
+- **`routers/coach.py`**: Fetches full coach history. Auto calls capped at last 4 entries (cost control — high frequency). Manual calls get last 10. Both `settings.coach_model` wired through.
+- **`llm.py`**: `stream_chat()` and `chat()` accept optional `model` param (defaults to `settings.llm_model`) — infrastructure for per-call model override.
+- **`config.py`**: `coach_model` setting added (currently `"deepseek-chat"` — was briefly `"deepseek-reasoner"`, reverted).
+
+#### Commentator Prompt Rewrite + Model Revert — IMPLEMENTED (2026-03-01)
+- **Model**: Reverted commentator back to `deepseek-chat` (V3). R1 caused severe latency (thinking phase before first token) and over-engineered observations. Timeout back to 30s.
+- **`llm.py`**: `stream_chat()` and `chat()` retain optional `model` param — infrastructure stays, just defaulting to V3 for both.
+- **`prompts/coach.py`**: Full rewrite of `COMMENTATOR_SYSTEM_PROMPT` based on Anthropic prompt engineering best practices:
+  - Context blocks moved ABOVE task instructions (Anthropic long-context best practice — improves response quality up to 30%)
+  - Three `<example>` tags with `<bad_observation>`/`<good_observation>` contrast — examples are the most reliable steering tool
+  - Observation framed as coaching: name what was missing, explain the effect it had
+  - Refined prompt mandate kept ("always output one") but reframed positively: "fill in what was genuinely absent, make implicit things explicit"
+  - "Length scales with need" replaces any word cap
+  - WHY embedded in instructions — Claude generalises from reasoning, not just rules
+- **Full context history** (auto + manual commentator messages) still passes in via `{{COMMENTATOR_HISTORY}}`
+
+#### Commentator Context Bug — FIXED (2026-02-28)
+**Root cause**: After 0→1 workshop completes, panel input routes to `/api/coach/respond`. That endpoint fetched only main chat messages (`messages` table) — which are empty before the user sends the workshop prompt to main chat. Empty context → model hallucinated, regurgitated its own system prompt, including `---PROMPT---`/`---END---` delimiters → parser extracted the system prompt as a "refined prompt" card.
+
+**Two fixes applied:**
+1. `backend/app/prompts/coach.py` — Removed literal `---PROMPT---`/`---END---` example block from `COMMENTATOR_SYSTEM_PROMPT` instructions (replaced with prose description). Added `workshop_messages` param to `build_coach_prompt()`. Added `_build_workshop_context()` helper that formats workshop exchange as `<workshop_context>` block.
+2. `backend/app/routers/coach.py` — `coach_respond()` now fetches workshop history from `coach_message_repo` (filtered to `coach_type="workshop"`) and passes it to `build_coach_prompt()`.
+
+**Result**: Post-workshop commentator engagement now has full context (workshop exchange visible) even before any main chat messages exist. Option B — commentator can discuss the workshop prompt.
 
 ---
 

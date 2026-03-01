@@ -490,10 +490,14 @@ function FeedItem({
     const refinedPrompt = promptMatch ? promptMatch[1].trim() : null;
     /* Commentary is everything outside the delimiters.
        During streaming, strip partial/complete delimiter markers so they don't
-       show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives). */
-    const commentary = refinedPrompt
-      ? cleanContent.replace(/---PROMPT---[\s\S]*?---END---/, "").trim()
-      : cleanContent.replace(/---PROMPT---[\s\S]*$/, "").trim();
+       show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives).
+       Also strip any "REFINED PROMPT" label the model outputs before the delimiters —
+       it's already represented by the card below, so showing it in the text is redundant. */
+    const commentary = (refinedPrompt
+      ? cleanContent.replace(/---PROMPT---[\s\S]*?---END---/, "")
+      : cleanContent.replace(/---PROMPT---[\s\S]*$/, ""))
+      .replace(/\*{0,2}REFINED PROMPT\*{0,2}\s*$/i, "")
+      .trim();
 
     return (
       <div className="animate-fade-in" style={{

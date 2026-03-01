@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # --- LLM Configuration ---
-    llm_model: str = "deepseek-chat"            # DeepSeek model identifier
+    llm_model: str = "deepseek-chat"            # Main chat model (DeepSeek V3)
+    coach_model: str = "deepseek-chat"          # Commentator model (DeepSeek V3 — fast, format-reliable)
     llm_base_url: str = "https://api.deepseek.com"  # OpenAI-compatible endpoint
     llm_timeout: int = 30                         # Seconds before API call times out
     llm_max_retries: int = 2                      # Automatic retries on transient failures

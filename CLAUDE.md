@@ -34,18 +34,19 @@ The main chat works normally. Commentator sits in the side panel in a dormant "W
 **Nudges appear like a Twitch-style chat sidebar** — the commentator's observations scroll in the panel. Minimal, not overwhelming.
 
 ### 0→1 Mode (Dark Mode)
-Per-exchange toggle. When activated:
-1. Theme switches to **dark mode** as a visual cue that something different is happening
-2. Commentator panel **opens wider, overlays the main conversation**
-3. User's message goes to commentator, NOT main LLM
-4. Back-and-forth workshop until prompt is refined
-5. Refined prompt placed in chat input (not sent automatically)
-6. User reviews/edits, sends to main LLM
-7. Theme switches back to **light mode (Freestyle)**
-8. Toggle disappears for this exchange — conversation continues in Freestyle
-9. User can toggle 0→1 again for any future message if needed
+Persistent mode. When activated:
+1. User selects 0→1 on the **welcome screen** (path picker)
+2. Theme switches to **dark mode** as a visual cue that something different is happening
+3. Commentator panel **opens wider, overlays the main conversation**
+4. User's message goes to commentator, NOT main LLM
+5. Back-and-forth workshop until prompt is refined
+6. Refined prompt stored in `workshopPrompt` state. Prompt card appears with "Use in chat" button.
+7. User clicks "Use in chat" → prompt injected into chat input (not sent automatically)
+8. User reviews/edits, sends to main LLM
+9. Main chat responds. Commentator auto-observes with topic-specific insights.
+10. Mode **stays dark** — persists until user starts a new conversation
 
-**0→1 is per-exchange, NOT per-conversation.** After workshop completes, you're in Freestyle.
+**0→1 is persistent, NOT per-exchange.** After workshop completes, main chat works normally in 0→1 dark theme.
 
 ## Commentator Panel
 
@@ -120,12 +121,10 @@ Full conversation history (all user messages + all LLM responses) every time com
 
 ## Mode Toggle
 
-- **Welcome screen**: Centered pill-shaped segmented control — `Freestyle | 0→1`
-- **In conversation**: Toggle moves near the commentator panel
+- **Welcome screen only**: Centered pill-shaped segmented control — `Freestyle | 0→1`. Once a mode is picked and the first prompt is sent, the toggle disappears. User starts a new conversation to pick a different path.
+- **No in-conversation toggle**: ConversationHeader was deleted. No toggle in panel.
 - **0→1 label**: Uses arrow → not word "to" (displayed as `0 → 1`)
-- Welcome copy: "Change how you work with AI"
-  - Freestyle subtitle: "Explore freely and brainstorm without limits"
-  - 0→1 subtitle: "Switch to 0→1 mode for rapid, goal-driven execution"
+- Welcome headline: "Averroes" with rotating shimmer subtitle phrases per mode
 
 ## Design References
 
@@ -143,7 +142,7 @@ Full conversation history (all user messages + all LLM responses) every time com
 
 | Layer | Choice | Why |
 |---|---|---|
-| Frontend | Next.js 14 (App Router) + TypeScript | Industry standard, SSR, great DX |
+| Frontend | Next.js 15 (App Router) + TypeScript | Industry standard, SSR, great DX |
 | UI | Inline styles + minimal CSS | Direct control, no Tailwind v4 theme issues |
 | Backend | FastAPI + Python 3.11+ | Async-native, great for streaming |
 | Database | SQLite + FTS5 (via aiosqlite) | Zero infrastructure, full-text search |
@@ -174,8 +173,8 @@ Frontend (Next.js) ──SSE──> Backend (FastAPI)
 1. **Two separate LLM streams**: Main chat and commentator never share context or interact
 2. **Commentator is observer-only**: Reads conversation, never writes to it
 3. **Nudges are heuristic (zero cost)**: Only Active engagement triggers LLM calls
-4. **0→1 is per-exchange**: Not a conversation mode — toggle on, workshop, send, toggle off
-5. **Theme = mode indicator**: Dark = 0→1 active, Light = Freestyle. Visual cue, part of the UX.
+4. **0→1 is persistent**: Stays dark until user starts a new conversation. Workshop completes → main chat works normally in dark theme.
+5. **Theme = mode indicator**: Dark = 0→1, Light = Freestyle. Visual cue, part of the UX.
 6. **Database**: SQLite + FTS5, swap to Postgres later via repository pattern
 7. **Streaming**: SSE for main chat and active commentator. REST for CRUD.
 

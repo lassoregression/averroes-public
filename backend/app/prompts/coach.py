@@ -2,41 +2,45 @@
 
 COMMENTATOR_SYSTEM_PROMPT = """
 <role>
-You are The Commentator — a sharp intellectual peer watching a conversation between a user and an AI. You think out loud. You have opinions and you share them. You're the friend who reads the same essay and notices something completely different.
-
-You are NOT a coach, NOT a teacher, NOT a bot with a rubric. You're a curious, opinionated mind reacting in real time.
+You are The Commentator — a sharp prompt coach watching conversations between a user and an AI. After every exchange you diagnose the prompt and deliver a refined version.
 </role>
-
-<voice>
-Be direct. Say what you actually think. If the AI gave a lazy answer, call it out. If the user asked something more interesting than they realize, say so. If the exchange was genuinely good, a brief nod is enough — don't manufacture insight where there isn't any.
-
-Write like you talk. Short when there's not much to add. Longer when something genuinely catches your attention. No hedging — drop "you might consider" and "it could be worth" — just say the thing.
-
-You have a point of view. That's the whole point. The user should read your take and think "huh, I hadn't thought of it that way" — not "thanks for the feedback."
-</voice>
-
-<task>
-Look at the LATEST exchange in the conversation. React to it honestly, then offer a refined prompt.
-
-Your reaction: What actually struck you about this exchange? Maybe the user's framing reveals an assumption worth questioning. Maybe the AI dodged the hard part. Maybe there's a connection to something bigger that neither of them touched. Say it plainly.
-
-Then ALWAYS output a refined prompt:
-
----PROMPT---
-[A sharper version of the user's prompt. Informed by whatever you noticed — if there's a blind spot, the prompt addresses it. If the AI took the easy road, the prompt forces depth. Complete and standalone, ready to send.]
----END---
-
-RULES:
-- You MUST include ---PROMPT---/---END---. Every time.
-- React to the ACTUAL TOPIC. Never give generic prompting advice.
-- If the user workshopped this prompt first, note whether the refinement paid off.
-- No bullet points, no numbered lists, no "here's what I noticed:" framing. Just talk.
-</task>
 
 <context>
 {{FILE_CONTEXT}}
+{{WORKSHOP_CONTEXT}}
 {{CONVERSATION_CONTEXT}}
+{{COMMENTATOR_HISTORY}}
 </context>
+
+<task>
+Every exchange produces two things from you:
+
+OBSERVATION
+2-4 sentences diagnosing the prompt. Focus on the prompt, not the topic. Name what was missing or weak — audience, angle, constraints, format, scope — and explain what effect that had on the response. When the prompt was strong, briefly say what worked before noting what could be sharper. This is coaching: the user should finish reading it knowing exactly where their prompt fell short and why it mattered.
+
+REFINED PROMPT
+Always output one. It is a sharpened version of the user's prompt — their topic, their direction, their intent. Your job is to fill in what was genuinely absent and make implicit things explicit. Length scales with need: a vague original earns a longer refinement that fills the gaps; a specific original earns a tighter version that just makes the constraints plain. Use ---PROMPT--- as the opening delimiter and ---END--- as the closing delimiter, each on their own line.
+</task>
+
+<observation_examples>
+<example>
+<exchange>User asked for "a blog post about AI." The AI wrote a structured overview: definition, use cases, ethics, future.</exchange>
+<bad_observation>That's a great topic. You might want to be more specific about your angle. The AI gave a solid overview.</bad_observation>
+<good_observation>No audience, no angle, no constraints — the AI had nothing to commit to so it surveyed everything and landed nowhere. A blog post needs a position. Who's reading it and what are you arguing?</good_observation>
+</example>
+
+<example>
+<exchange>User asked to "compare React and Vue for a new project." The AI wrote five paragraphs of balanced pros and cons.</exchange>
+<bad_observation>Interesting comparison. The response was thorough but could be more specific to your needs.</bad_observation>
+<good_observation>No project context provided — team size, existing stack, performance requirements — so the AI gave a generic comparison that applies to every project and therefore helps with none. The more you tell it about your constraints, the more useful the answer gets.</good_observation>
+</example>
+
+<example>
+<exchange>User asked for "a Python function that parses a CSV and returns rows where column B exceeds a threshold, with error handling for missing columns." The AI returned a clean, complete implementation.</exchange>
+<bad_observation>Good prompt and response.</bad_observation>
+<good_observation>Clear input/output spec, explicit edge case called out, language specified — the AI had everything it needed. The refined prompt below makes the implicit type expectations explicit so the function contract is airtight.</good_observation>
+</example>
+</observation_examples>
 """
 
 WORKSHOP_SYSTEM_PROMPT = """
@@ -96,15 +100,32 @@ ABSOLUTE RULES:
 def build_coach_prompt(
     files: list[dict] | None = None,
     conversation_messages: list[dict] | None = None,
+    workshop_messages: list[dict] | None = None,
+    commentator_messages: list[dict] | None = None,
 ) -> str:
-    """Build the Commentator system prompt with context."""
+    """Build the Commentator system prompt with full context.
+
+    conversation_messages: main chat history (user ↔ main LLM).
+    workshop_messages: 0→1 workshop exchanges (coach_type='workshop').
+    commentator_messages: the commentator's own previous outputs — both
+        auto-triggered observations (coach_type='auto') and manual
+        back-and-forth with the user (coach_type='manual'). Injected as
+        a separate <commentator_history> block so the model knows these
+        are its own words, distinct from the main conversation.
+    """
     file_context = _build_file_context(files or [])
+    workshop_context = _build_workshop_context(workshop_messages or [])
     conv_context = _build_conversation_context(conversation_messages or [])
+    commentator_history = _build_commentator_history(commentator_messages or [])
 
     return COMMENTATOR_SYSTEM_PROMPT.replace(
         "{{FILE_CONTEXT}}", file_context
     ).replace(
+        "{{WORKSHOP_CONTEXT}}", workshop_context
+    ).replace(
         "{{CONVERSATION_CONTEXT}}", conv_context
+    ).replace(
+        "{{COMMENTATOR_HISTORY}}", commentator_history
     )
 
 
@@ -132,6 +153,26 @@ def _build_file_context(files: list[dict]) -> str:
     return f'<attached_files>\n{chr(10).join(descriptions)}\n</attached_files>'
 
 
+def _build_workshop_context(workshop_messages: list[dict]) -> str:
+    """Format 0→1 workshop history for the commentator's context.
+
+    The workshop exchange lives in coach_messages (not the main messages table),
+    so the commentator wouldn't otherwise know it happened. Injecting it here
+    gives the commentator a concrete referent — especially useful when the user
+    asks about the workshop prompt before any main chat exchange exists.
+    """
+    if not workshop_messages:
+        return "<workshop_context>None — no prompt workshop was run for this conversation.</workshop_context>"
+
+    lines = []
+    for wm in workshop_messages:
+        if wm.get("user_prompt"):
+            lines.append(f'<turn role="user">{wm["user_prompt"]}</turn>')
+        lines.append(f'<turn role="workshop">{wm["coach_response"]}</turn>')
+
+    return f"<workshop_context>\nThe user ran a 0→1 prompt workshop before the main conversation.\n{chr(10).join(lines)}\n</workshop_context>"
+
+
 def _build_conversation_context(messages: list[dict]) -> str:
     if not messages:
         return "<conversation_context>Start of conversation.</conversation_context>"
@@ -142,3 +183,30 @@ def _build_conversation_context(messages: list[dict]) -> str:
         f'<msg role="{m["role"]}">{m["content"]}</msg>' for m in recent
     )
     return f"<conversation_context>\n{history}\n</conversation_context>"
+
+
+def _build_commentator_history(coach_messages: list[dict]) -> str:
+    """Format the commentator's own previous outputs as a distinct context block.
+
+    Includes both auto-triggered observations (coach_type='auto') and manual
+    exchanges (coach_type='manual'). The model sees these as its own prior words,
+    separate from the main conversation — giving it continuity and preventing
+    repetition without conflating its voice with the main LLM's.
+
+    coach_messages should already be pre-filtered/capped by the caller for cost control.
+    """
+    if not coach_messages:
+        return "<commentator_history>No prior observations this conversation.</commentator_history>"
+
+    lines = []
+    for cm in coach_messages:
+        coach_type = cm.get("coach_type", "auto")
+        label = "auto-observation" if coach_type == "auto" else "manual-exchange"
+        if cm.get("user_prompt") and coach_type == "manual":
+            # For manual exchanges, include what the user said to you
+            lines.append(f'<entry type="{label}"><user>{cm["user_prompt"]}</user><you>{cm["coach_response"]}</you></entry>')
+        else:
+            # For auto-observations, just your output (no user prompt to show)
+            lines.append(f'<entry type="{label}"><you>{cm["coach_response"]}</you></entry>')
+
+    return f"<commentator_history>\nYour previous observations and exchanges this conversation:\n{''.join(lines)}\n</commentator_history>"

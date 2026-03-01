@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.models.schemas import CoachRequest, WorkshopSendRequest, CoachMessageOut, RatingCreate, RatingOut
 from app.services.llm import stream_chat, chat
 from app.prompts.coach import build_coach_prompt, build_workshop_prompt
+from app.config import settings
 from app.routers.chat import _generate_title
 from app.repositories.conversation import (
     conversation_repo,
@@ -31,17 +32,37 @@ async def coach_respond(req: CoachRequest):
     if not convo:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Build context from conversation history — the commentator observes the full exchange
+    # Build full context for the commentator's "mind":
+    # 1. Main conversation (user ↔ main LLM) — commentator observes but main LLM never sees this
+    # 2. Workshop history (0→1 refinement session, if any)
+    # 3. Commentator's own prior outputs (auto-observations + manual exchanges)
+    #    — gives it continuity and prevents repetition across the conversation
     messages = await message_repo.list_for_conversation(req.conversation_id)
     conv_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
-    system_prompt = build_coach_prompt(conversation_messages=conv_messages)
+
+    all_coach = await coach_message_repo.list_for_conversation(req.conversation_id)
+    workshop_messages = [c for c in all_coach if c["coach_type"] == "workshop"]
+
+    # Separate commentator's own history (auto + manual) from workshop.
+    # Cost control: for auto-triggered calls (high frequency), cap to last 4 entries
+    # so the context doesn't balloon over long conversations. Manual engagement (user-
+    # initiated) gets more history since they're actively conversing with the commentator.
+    is_auto = req.coach_type.value == "auto"
+    prior_coach = [c for c in all_coach if c["coach_type"] in ("auto", "manual")]
+    commentator_messages = prior_coach[-4:] if is_auto else prior_coach[-10:]
+
+    system_prompt = build_coach_prompt(
+        conversation_messages=conv_messages,
+        workshop_messages=workshop_messages,
+        commentator_messages=commentator_messages,
+    )
 
     # For auto-triggered coaching, send a generic trigger so the LLM analyzes the
     # conversation context in the system prompt rather than responding to the prompt directly.
     # For manual coaching (user types in panel), send their actual message.
     trigger = (
         "Analyze the latest exchange in the conversation and provide your observation and refined prompt."
-        if req.coach_type.value == "auto"
+        if is_auto
         else req.message
     )
     coach_messages = [{"role": "user", "content": trigger}]
@@ -49,7 +70,10 @@ async def coach_respond(req: CoachRequest):
     async def event_stream():
         full_response = ""
         try:
-            async for chunk in stream_chat(coach_messages, system_prompt):
+            # Use deepseek-reasoner (R1) for the commentator — it reasons across
+            # multiple context streams (main chat, workshop, its own history).
+            # Thinking tokens are filtered in stream_chat and never reach the client.
+            async for chunk in stream_chat(coach_messages, system_prompt, model=settings.coach_model):
                 full_response += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
