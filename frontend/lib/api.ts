@@ -100,7 +100,7 @@ export async function createConversation(
   mode: "regular" | "zero_to_one" = "regular",
   spaceId?: string,
 ): Promise<Conversation> {
-  return apiFetch("/conversations/", {
+  return apiFetch("/conversations", {
     method: "POST",
     body: JSON.stringify({ mode, space_id: spaceId }),
   });
@@ -111,7 +111,7 @@ export async function listConversations(
   spaceId?: string,
 ): Promise<Conversation[]> {
   const params = spaceId ? `?space_id=${spaceId}` : "";
-  return apiFetch(`/conversations/${params}`);
+  return apiFetch(`/conversations${params}`);
 }
 
 /** Get a single conversation by ID */
@@ -313,7 +313,7 @@ async function* parseSSEStream(
 
 /** Create a new space */
 export async function createSpace(name: string): Promise<Space> {
-  return apiFetch("/spaces/", {
+  return apiFetch("/spaces", {
     method: "POST",
     body: JSON.stringify({ name }),
   });
@@ -321,7 +321,7 @@ export async function createSpace(name: string): Promise<Space> {
 
 /** List all spaces for the current user */
 export async function listSpaces(): Promise<Space[]> {
-  return apiFetch("/spaces/");
+  return apiFetch("/spaces");
 }
 
 /** Rename a space */

@@ -11,6 +11,8 @@ A living record of decisions made, things attempted, observations from testing, 
 - **Models**: Both use `deepseek-chat` (DeepSeek V3) via OpenAI-compatible SDK.
 - **Cost model**: 2 LLM calls per exchange (main chat + auto-commentator). Manual commentator engagement adds more calls but is user-initiated.
 - **Database**: SQLite with 6 tables. `messages` = main chat. `coach_messages` = all commentator output (auto, manual, workshop). `ratings` = thumbs up/down (built, no UI yet).
+- **Routing**: FastAPI runs with `redirect_slashes=False`. Collection endpoints use `""` (no trailing slash). Next.js strips trailing slashes before rewrites — routes must match without slash or 307 redirects break external access.
+- **ngrok**: `ngrok.yml` at project root. Tunnels port 3000 only (Next.js rewrites handle backend proxying server-side). Auth token stored via `ngrok config add-authtoken`. Docker Compose has an optional `tunnel` profile.
 
 ### Commentator Context ("The Mind")
 The commentator receives four distinct context blocks in its system prompt:
@@ -36,6 +38,17 @@ Built using Anthropic prompt engineering best practices (docs.anthropic.com):
 ---
 
 ## Tried & Tested Log
+
+---
+
+### ngrok External Access — Trailing Slash 307 Bug (Fixed 2026-03-03)
+**What it was**: App worked locally but failed when accessed via ngrok from an external system with "failed to create conversation."
+**Root cause**: Next.js 15 normalises URL paths before applying `next.config.js` rewrites — it strips trailing slashes. So the frontend calling `/api/conversations/` became `/api/conversations` by the time it hit the Next.js rewrite proxy. That request was forwarded to FastAPI as `/api/conversations` (no slash). FastAPI's default `redirect_slashes=True` issued a `307 Temporary Redirect` to `http://localhost:8000/api/conversations/` — an absolute URL pointing to localhost. Local browsers can follow that redirect fine (localhost is accessible). External browsers via ngrok cannot reach `localhost:8000`, so the redirect resulted in a network error.
+**Fix**: Three-part:
+1. `FastAPI(redirect_slashes=False)` in `main.py` — eliminates all 307 redirects entirely.
+2. Collection route endpoints in `conversations.py` and `spaces.py` changed from `"/"` to `""` — routes are now registered at `/api/conversations` and `/api/spaces` (no trailing slash), matching what Next.js actually sends.
+3. `api.ts` collection calls updated to drop trailing slashes (`/conversations/` → `/conversations`, `/spaces/` → `/spaces`).
+**What to watch**: Any new FastAPI collection endpoints should use `""` not `"/"` for the root path. Don't re-enable `redirect_slashes` without also handling the ngrok/proxy case.
 
 ---
 

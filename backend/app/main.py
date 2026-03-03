@@ -26,6 +26,10 @@ app = FastAPI(
     description="The Commentator — AI prompt coaching engine",
     version="0.1.0",
     lifespan=lifespan,
+    # Disable automatic trailing-slash redirects. Without this, FastAPI sends a
+    # 307 to http://localhost:8000/... which external browsers (via ngrok) can't
+    # reach. Routes are defined without trailing slash instead.
+    redirect_slashes=False,
 )
 
 # CORS

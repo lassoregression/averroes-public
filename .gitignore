@@ -40,3 +40,7 @@ htmlcov/
 
 # Misc
 *.log
+
+# ngrok — if you customize ngrok.yml locally (e.g. add authtoken), keep it out of git
+# ngrok.yml is checked in with safe defaults, but override files should not be
+ngrok.local.yml

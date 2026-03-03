@@ -54,6 +54,30 @@ services:
       - backend
     command: npm run dev
 
+  # --- ngrok: Public tunnel for the frontend ---
+  # Exposes localhost:3000 publicly. Next.js rewrites handle /api/* to the
+  # backend internally, so no backend tunnel is needed.
+  #
+  # Requires NGROK_AUTHTOKEN in your environment or a .env file at the repo root.
+  # Get a token at: https://dashboard.ngrok.com/get-started/your-authtoken
+  #
+  # Usage:
+  #   NGROK_AUTHTOKEN=<token> docker compose --profile tunnel up
+  #
+  # Once running, the public URL appears in the ngrok service logs and at:
+  #   http://localhost:4040  (ngrok web inspector)
+  ngrok:
+    image: ngrok/ngrok:latest
+    profiles:
+      - tunnel
+    ports:
+      - "4040:4040"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http frontend:3000 --log=stdout
+    depends_on:
+      - frontend
+
 volumes:
   # Named volume for persistent database storage
   backend-data:

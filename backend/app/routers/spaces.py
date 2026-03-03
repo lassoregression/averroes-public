@@ -8,7 +8,7 @@ router = APIRouter(prefix="/api/spaces", tags=["spaces"])
 DEMO_USER_ID = "demo-user"
 
 
-@router.post("/", response_model=SpaceOut)
+@router.post("", response_model=SpaceOut)
 async def create_space(req: SpaceCreate):
     """Create a new space."""
     space = await space_repo.create(
@@ -18,7 +18,7 @@ async def create_space(req: SpaceCreate):
     return SpaceOut(**space, conversation_count=0)
 
 
-@router.get("/", response_model=list[SpaceOut])
+@router.get("", response_model=list[SpaceOut])
 async def list_spaces():
     """List all spaces for the current user."""
     spaces = await space_repo.list_for_user(DEMO_USER_ID)

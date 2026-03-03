@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 DEMO_USER_ID = "demo-user"
 
 
-@router.post("/", response_model=ConversationOut)
+@router.post("", response_model=ConversationOut)
 async def create_conversation(req: ConversationCreate):
     """Create a new conversation."""
     convo = await conversation_repo.create(
@@ -26,7 +26,7 @@ async def create_conversation(req: ConversationCreate):
     return ConversationOut(**convo, message_count=0, last_message_preview=None)
 
 
-@router.get("/", response_model=list[ConversationOut])
+@router.get("", response_model=list[ConversationOut])
 async def list_conversations(space_id: str | None = None):
     """List all conversations for the current user."""
     convos = await conversation_repo.list_for_user(DEMO_USER_ID, space_id)

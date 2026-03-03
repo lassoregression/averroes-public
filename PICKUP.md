@@ -1,6 +1,6 @@
 # Averroes — Pickup File
 
-Last session: 2026-03-01
+Last session: 2026-03-03
 
 ## Current State
 
@@ -10,6 +10,42 @@ Last session: 2026-03-01
 - **Phase 3 (The Commentator)**: Complete — nudge engine, panel UI, auto-commentator after every exchange, coaching stream
 - **Phase 4 (0→1 Workshop)**: Complete — workshop back-and-forth, `[WORKSHOP_READY]` signal, refined prompt card, persistent 0→1 mode
 - **Phase 5 (Sidebar)**: Complete — real conversation data, navigation, delete, titles, state clearing
+
+### Last Changed (2026-03-03)
+
+#### ngrok — Public Tunnel for Sharing the App
+- **Added `ngrok.yml`** at project root — defines the `averroes` tunnel on port 3000. Frontend proxies API calls server-side, so only port 3000 needs tunneling.
+- **Updated `docker-compose.yml`** — added `ngrok` service under the `tunnel` profile. Not started by default; opt-in with `--profile tunnel`.
+- **Updated `.env.example`** — `NGROK_AUTHTOKEN` documented (required for Docker Compose tunnel profile).
+- **Updated `.gitignore`** — `ngrok.local.yml` excluded (for local customisations that shouldn't be committed).
+- **Updated `next.config.js`** — added `allowedDevOrigins` for `*.ngrok-free.app`, `*.ngrok-free.dev`, `*.ngrok.io`, `*.ngrok.app` to allow Next.js dev server to accept cross-origin requests from ngrok domains.
+
+**To start with ngrok (local, not Docker):**
+```bash
+# One-time setup
+ngrok config add-authtoken <your_token>
+
+# Start everything
+cd backend && uvicorn app.main:app --reload --port 8000   # terminal 1
+cd frontend && npm run dev                                  # terminal 2
+cd .. && ngrok start averroes --config "$HOME/Library/Application Support/ngrok/ngrok.yml" --config ngrok.yml  # terminal 3
+```
+
+#### Trailing-Slash 307 Redirect Fix — External Access via ngrok
+- **Root cause**: Next.js 15 strips trailing slashes from paths before applying rewrites. Frontend called `/api/conversations/` → Next.js sent `/api/conversations` to FastAPI → FastAPI issued a `307 Temporary Redirect` to `http://localhost:8000/api/conversations/`. External browsers (via ngrok) can't reach `localhost:8000`, so the redirect failed silently. The bug didn't appear locally because local browsers *can* follow the redirect.
+- **Fix (3 files)**:
+  1. `backend/app/main.py` — `FastAPI(..., redirect_slashes=False)` — stops all 307 redirects.
+  2. `backend/app/routers/conversations.py` — collection routes changed from `@router.post("/")` / `@router.get("/")` to `@router.post("")` / `@router.get("")` — accessible at `/api/conversations` (no trailing slash).
+  3. `backend/app/routers/spaces.py` — same change as above for spaces.
+  4. `frontend/lib/api.ts` — `/conversations/` → `/conversations` and `/spaces/` → `/spaces` in all collection calls.
+
+#### Security Audit — No Issues Found
+- Audited all backend routes for env var / API key leakage. No route serialises the `settings` object or exposes `.env` contents.
+- `.gitignore` already excluded `.env` files.
+- File uploads validate extension (whitelist) and size — no path traversal risk.
+- FastAPI auto-docs (`/docs`, `/openapi.json`) are enabled — expose API schema but no credentials. Acceptable for dev prototype.
+
+---
 
 ### Last Changed (2026-02-21)
 
@@ -164,6 +200,9 @@ cd /Users/jeeb/ccode/averroes/backend && source .venv/bin/activate && uvicorn ap
 
 # Frontend
 cd /Users/jeeb/ccode/averroes/frontend && npm run dev
+
+# ngrok (optional — share publicly)
+cd /Users/jeeb/ccode/averroes && ngrok start averroes --config "$HOME/Library/Application Support/ngrok/ngrok.yml" --config ngrok.yml
 ```
 
-Frontend: http://localhost:3000 | Backend: http://localhost:8000
+Frontend: http://localhost:3000 | Backend: http://localhost:8000 | ngrok inspector: http://localhost:4040
