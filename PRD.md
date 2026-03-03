@@ -1,475 +1,225 @@
-# Averroes — Product Requirements Document
+# Averroes
+## Product Requirements Document
 
-**Last updated**: 2026-02-21
-**Status**: Living document — updated as product evolves
-
----
-
-## 1. Vision
-
-Averroes is an AI workspace with a built-in coaching layer. Every AI chat app gives you a conversation. Averroes gives you a conversation **and** an observer — The Commentator — who watches, nudges, and coaches you to get better results from AI, in real time.
-
-The thesis: **the quality of AI output is gated by the quality of human input.** Most people don't know what to ask, how to ask it, or what they're missing. Prompt engineering tools exist, but they're separate apps — copy your prompt, paste it into a tool, get suggestions, copy back. Averroes eliminates that friction by embedding coaching directly into the conversation flow.
-
-**One sentence**: ChatGPT with a built-in coach that makes everyone — from first-time users to daily power users — measurably better at working with AI.
+**Version**: 2.0
+**Last Updated**: March 2026
+**Status**: Active Development
+**Audience**: Executive and Product Stakeholders
 
 ---
 
-## 2. Problem Statement
+## Executive Summary
 
-### The gap between AI capability and human utilization
+Averroes is an AI workspace with a built-in coaching layer. Every enterprise that has deployed AI has discovered the same problem: model capability is not the bottleneck. Prompt quality is. The gap between what employees ask AI and what they could ask it represents hundreds of hours of lost productivity per team, per year.
 
-AI models are dramatically more capable than how most people use them. The problem isn't the model — it's the prompt. Studies show:
+Averroes closes that gap. Rather than requiring employees to take prompt engineering courses or consult separate tools, Averroes embeds a second AI layer directly inside the conversation. This layer, called The Commentator, observes every interaction and coaches users in real time. It is always present, never disruptive, and requires no behavior change to activate.
 
-- Most users write vague, underspecified prompts
-- The same user gets 2-10x better results with minimal prompt refinement
-- Users don't know what they don't know — they can't see their own blind spots
-- "Prompt engineering" is a skill most people don't have time to learn separately
-
-### Why existing solutions fail
-
-| Solution | Problem |
-|---|---|
-| **Prompt libraries** (PromptBase, FlowGPT) | Static templates. Don't adapt to your specific situation. Copy-paste workflow. |
-| **Prompt optimizers** (PromptPerfect) | Separate tool. Extra step. Users forget to use it. |
-| **Courses / guides** | Learning doesn't happen at the point of action. Knowledge decays. |
-| **ChatGPT's "suggestions"** | Self-serving — the model suggests what's easy for it, not what's best for you. |
-| **System prompts / custom instructions** | One-size-fits-all. Don't adapt per-message. |
-
-### Averroes's insight
-
-Coaching works best when it's:
-1. **Integrated** — embedded in the workflow, not a separate step
-2. **Real-time** — happens at the point of action, not before or after
-3. **Observer-based** — a separate perspective, not the model coaching itself
-4. **Cost-efficient** — most nudges should be free (heuristic), not burning API credits
+The result is a measurable lift in AI output quality across every skill level, from first-time users to daily power users, without any additional training overhead or workflow friction.
 
 ---
 
-## 3. Target Users
+## 1. Problem
 
-### Universal — from beginners to power users
+### The Utilization Gap
 
-Averroes is designed for **everyone who uses AI**, regardless of skill level:
+Organizations have invested heavily in AI access. What they have not solved is AI utilization. The challenge is not that employees lack access to AI tools. It is that most employees lack the skill to get consistent, high-quality results from them.
 
-| Segment | Pain Point | How Averroes Helps |
-|---|---|---|
-| **AI newcomers** | Don't know what to ask or how to phrase it | 0→1 Workshop guides them from vague idea to structured prompt |
-| **Casual users** | Get "okay" results, don't know they could do better | Nudges reveal missed dimensions ("You didn't specify audience — who reads this?") |
-| **Daily users** | Developed habits but have blind spots | Commentator catches patterns ("You're circling the same topic — define the deliverable") |
-| **Power users** | Already good at prompting, want edge-case insights | Topic-specific observations — blind spots, assumptions, non-obvious angles |
-| **Enterprise teams** | Uneven AI adoption, inconsistent output quality | Coaching layer raises the floor — everyone gets better, not just the prompt engineers |
+Research on large language model usage shows that the same prompt, with minor structural improvements, can yield outputs that are two to ten times more useful. The barrier is not technical. It is behavioral. Most users do not know what they are missing, because the AI responds to whatever it receives without indicating that a better question existed.
 
-### Key insight: coaching scales down to zero friction
+This creates three compounding problems for enterprises:
 
-- Beginners get active guidance (0→1 mode, workshops)
-- Advanced users see passive nudges they can ignore
-- The Commentator's intensity matches the user's need automatically
+First, output quality is inconsistent across teams. Power users who have internalized prompt engineering get dramatically better results than their colleagues. This creates uneven adoption and uneven productivity gains, undermining the business case for AI investment.
+
+Second, the skills gap does not self-correct. Employees who receive mediocre AI output do not know their prompt was the cause. They attribute the limitation to the model and disengage. The feedback loop that would normally teach them is absent.
+
+Third, existing solutions require behavior change outside the workflow. Prompt libraries, optimization tools, and training programs all demand that employees stop what they are doing, consult an external resource, and return to their work. Adoption rates for these approaches are predictably low.
+
+### Why This Matters at Enterprise Scale
+
+At the individual level, the utilization gap is a minor inconvenience. At enterprise scale, it is a significant drag on AI ROI. An organization with ten thousand knowledge workers, each conducting an average of five AI interactions per day, is generating fifty thousand interactions daily. If sixty percent of those interactions are underspecified, the compounded productivity loss is material.
+
+The solution cannot be "train everyone." It must be embedded in the tool itself.
 
 ---
 
-## 4. Core Product
+## 2. Solution
 
-### 4.1 The Two-Stream Architecture
+### The Coaching Layer
+
+Averroes adds a second AI stream to every conversation. This stream, The Commentator, operates independently of the main chat. It observes what the user asks, watches how the AI responds, and surfaces targeted coaching in a persistent side panel.
+
+The architecture enforces a strict separation. The Commentator reads the conversation but never influences the main AI's context. The main AI is unaware the Commentator exists. This one-way data flow is intentional: it allows The Commentator to give honest, unbiased coaching because it has no stake in the AI's response.
+
+Most of The Commentator's observations are generated without any AI call. A five-layer heuristic engine runs entirely in the browser, classifying the user's prompt by task type, scoring it across five dimensions, detecting anti-patterns, and analyzing response signals. Only when a user explicitly engages with The Commentator does an additional AI call occur. This design keeps the cost of coaching close to zero for the majority of interactions.
+
+### Two Interaction Modes
+
+Averroes ships with two distinct modes, each designed for a different user state.
+
+**Freestyle** is the default. The main chat works exactly as users expect from any AI product. The Commentator operates in the background, surfacing brief observations in the side panel after each exchange. Users can ignore these entirely, or they can engage directly, opening a back-and-forth dialogue with The Commentator about how to improve their approach. The mode is designed for users who know what they want and benefit from a second opinion.
+
+**0 to 1** is a structured workshop mode. Activating it signals that the user has a vague idea but is not yet ready to engage the main AI. The Commentator takes over the interaction, asks two to three clarifying questions, and returns a refined, well-structured prompt. The user reviews the prompt, edits it if needed, and sends it to the main chat. This mode is designed for beginners, for complex tasks, and for any situation where the user is not sure how to frame what they need. The workshop completes once, and the conversation continues normally afterward.
+
+The mode is selected once, on the welcome screen, at the start of each conversation. There is no toggle during the conversation. The choice is intentional: different tasks require different approaches, and making the selection explicit encourages users to think about what they actually need before they start typing.
+
+---
+
+## 3. Target Users and Enterprise Fit
+
+Averroes is designed to raise the floor across an entire organization, not to serve a narrow segment of power users.
+
+**Knowledge workers with low AI confidence** receive active guidance through the 0 to 1 workshop. They never have to understand prompt engineering; the product handles it for them.
+
+**Regular users with moderate AI fluency** receive passive nudges that surface what they are missing. "You did not specify audience" or "Your prompt asked three different things" is more actionable than any generic training material because it is specific to the work they are doing right now.
+
+**Advanced users and prompt engineers** receive The Commentator's deeper observations: assumptions being made, non-obvious angles being missed, and cases where the AI's response signals a structural problem in the prompt. For users who already know what they are doing, The Commentator acts as a sparring partner rather than a tutor.
+
+For enterprise buyers, the organizational argument is straightforward. A coaching layer that adapts to every skill level eliminates the need for tiered training programs. It raises the median quality of AI interactions across the entire workforce. And it does so without asking employees to change their workflow, download a new tool, or consult a separate system.
+
+---
+
+## 4. Product Architecture
+
+### Two-Stream Design
 
 ```
-User input ──────────────────────────→ Main Chat (LLM)
-    │                                       │
-    │ (observes)                    (observes response)
-    ▼                                       ▼
-Commentator (separate LLM call) ─────→ Side Panel UI
+User Input ───────────────────────────> Main Chat AI
+     |                                       |
+     | (observes)                  (observes response)
+     v                                       v
+The Commentator (separate AI call) ───> Side Panel
 ```
 
-**Main Chat**: Standard AI conversation. Unaware of the Commentator.
-**The Commentator**: Observes both user prompts and LLM responses. Never interacts with the main LLM directly. One-way data flow.
+The main chat AI and The Commentator never share context. Each makes independent calls. The Commentator is an observer, not a participant.
 
-This separation is critical:
-- The Commentator can be honest because it's not trying to be helpful to itself
-- Main chat quality isn't degraded by coaching instructions in its context
-- Cost is isolated — coaching costs scale independently of chat costs
+### Heuristic Engine (Zero Cost)
 
-### 4.2 Two Modes
+The five-layer heuristic engine runs client-side in the browser. It classifies every prompt before the user sends it and analyzes every response the AI returns. Observations generated by this engine require no API call.
 
-#### Freestyle (Default — Light Mode + Blue Panel)
-The main chat works normally. The Commentator sits in the side panel, observing.
+The layers are: task type classification (code, writing, analysis, creative, research), missing dimension scoring per task type, anti-pattern detection (pleasantries, compound requests, vague follow-ups), post-response signal analysis (AI response length relative to prompt length, clarifying questions from the AI, multiple-approach hedging), and composite prompt scoring across specificity, context, structure, constraints, and examples.
 
-**Commentator states:**
-1. **Dormant** — "Watching..." — Zero LLM calls. Always visible.
-2. **Nudging** — Heuristic-triggered tips appear. No LLM calls. User can ignore or engage.
-3. **Active** — User engages commentator explicitly. LLM calls happen. Back-and-forth coaching.
+This engine is the foundation of the cost model. In a typical session, the majority of coaching is delivered free. AI calls are reserved for moments when a user explicitly engages.
 
-**Best for**: Users who know what they want and just need occasional nudges.
+### Current Technical Foundation
 
-#### 0→1 Mode (Dark Mode + Red Panel)
-A structured workshop that takes a vague idea and refines it into a high-quality prompt before sending it to the main chat.
-
-**Flow**:
-1. User selects 0→1 on the welcome screen (path picker)
-2. Theme shifts to dark mode — visual cue that this is different
-3. User types their idea → routed to workshop (not main chat)
-4. Workshop asks 2-3 clarifying questions
-5. User answers → Workshop produces a refined prompt
-6. Prompt card appears with "Use in chat" button
-7. User reviews, edits if needed, sends to main chat
-8. Main chat responds. Commentator auto-observes with topic-specific insights.
-9. Mode persists — stays dark until user starts a new conversation
-
-**Best for**: Beginners, complex tasks, or anytime you're not sure what you want.
-
-### 4.3 Nudge Engine (Zero LLM Cost)
-
-Five-layer heuristic system that runs client-side:
-
-| Layer | What It Does | Cost |
-|---|---|---|
-| 1. Task Type Detection | Classifies prompt (code, writing, analysis, creative, research) | Zero |
-| 2. Missing Dimension Scoring | Checks for missing context per task type | Zero |
-| 3. Anti-Pattern Detection | Catches bad habits (pleasantries, multi-requests, vagueness) | Zero |
-| 4. Post-Response Analysis | Analyzes LLM response signals (too long, asked questions, offered options) | Zero |
-| 5. Composite Scoring (0-50) | Specificity + Context + Structure + Constraints + Examples | Zero |
-
-Nudges appear in the Commentator panel like a Twitch-style chat sidebar — minimal, not overwhelming.
-
-> **Current status**: The nudge engine is fully built (`frontend/lib/nudge-engine.ts`) but currently **not wired up** in Freestyle mode. We removed pre-response nudge cards because they felt template-y and appeared before the AI even responded. The LLM auto-commentator now handles all observations after each exchange.
->
-> **Opportunity**: The heuristic engine is potentially better used as a *silent pre-filter* — instead of showing nudge cards to the user, use the composite prompt score internally to decide whether to trigger the commentator at all, or to adjust its tone. A score < 15 could prime the commentator to focus on the prompt's weaknesses before commenting on the topic. Score > 35 could signal the commentator to skip structural observations entirely and go straight to the intellectual reaction. This would make the engine invisible to the user but meaningful to the output quality — no clutter, more signal.
-
-### 4.4 Commentator Panel
-
-Always-visible right side panel. Adapts to mode:
-
-- **Freestyle**: Compact. Shows nudges, "Talk to Commentator" button. Expands when engaged.
-- **0→1**: Full-width overlay during workshop. Shows conversation-style input for back-and-forth.
-- **After workshop**: Returns to normal width. Shows prompt card + auto-observations.
+The prototype is a full-stack web application built on Next.js 15 (TypeScript) on the frontend and FastAPI (Python) on the backend, with a SQLite database and full-text search. The backend is structured with a repository pattern specifically to allow a clean migration to PostgreSQL or any enterprise database without application changes. Authentication, SSO integration, and on-premises deployment are on the roadmap and are architecturally supported.
 
 ---
 
-## 5. Current State (What's Built)
+## 5. Current State
 
-### Completed (Phases 1-5)
+Phases 1 through 5 are complete. The core product is functional and testable.
 
-| Phase | What | Status |
-|---|---|---|
-| **Phase 1: Foundation** | Next.js 15 + FastAPI scaffold, SQLite + FTS5, config | DONE |
-| **Phase 2: Core Chat** | SSE streaming, conversation CRUD, message rendering | DONE |
-| **Phase 3: Commentator** | Nudge engine, panel UI, auto-commentator after every exchange | DONE |
-| **Phase 4: 0→1 Workshop** | Workshop flow, persistent mode, manual "Use in chat", prompt cards | DONE |
-| **Phase 5: Sidebar** | Real conversation data, navigation, delete, auto-titles | DONE |
+**Foundation (Phase 1):** Full-stack scaffold, database schema, configuration management, and development environment.
 
-### Architecture
+**Core Chat (Phase 2):** Real-time streaming conversation via Server-Sent Events, full conversation lifecycle (create, title, navigate, delete), and message rendering.
 
-```
-Frontend (Next.js 15 + TypeScript) ──SSE──> Backend (FastAPI + Python 3.11+)
-                                                  │
-                                    ┌─────────────┼─────────────┐
-                                    │             │              │
-                              LLM Service   DB Repository   File Parser
-                              (DeepSeek)    (SQLite+FTS5)   (future)
-```
+**The Commentator (Phase 3):** Heuristic nudge engine, side panel UI, and automatic commentary after every exchange. The Commentator generates a response after each main chat interaction, using the full conversation history and its own prior observations as context.
 
-**Key design choices:**
-- Repository pattern (swap SQLite → Postgres by changing one file)
-- Nudge engine runs client-side (zero backend calls for heuristics)
-- SSE for streaming (main chat + active commentator)
-- Inline styles (Tailwind v4 theme variables didn't map correctly)
-- Two DeepSeek calls per exchange (chat + commentator). Always generates.
+**0 to 1 Workshop (Phase 4):** The structured workshop flow, prompt refinement cards, persistent mode state, and the "Use in chat" handoff from workshop to main conversation.
 
-### Tech Stack
-
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js 15 (App Router) + TypeScript |
-| UI | Inline styles + minimal CSS |
-| Backend | FastAPI + Python 3.11+ |
-| Database | SQLite + FTS5 (via aiosqlite) |
-| LLM | DeepSeek (via OpenAI SDK) |
-| Deployment (planned) | Vercel (frontend) + Railway (backend) |
+**Sidebar and Navigation (Phase 5):** Conversation list, navigation, titles, and state management.
 
 ---
 
 ## 6. Roadmap
 
-### Phase 6: File Handling
-**Goal**: Users can upload documents as context for their conversations.
+### Near Term
 
-| Feature | Details |
-|---|---|
-| File upload UI | Drag-and-drop + click-to-upload in chat input area |
-| Supported formats | PDF (pypdf), DOCX (python-docx), TXT, MD, CSV |
-| Size limits | 10MB max per file, whitelist MIME types |
-| Context injection | Parsed text injected into LLM context with clear delimiters |
-| Commentator awareness | Commentator sees uploaded context and factors it into observations |
-| Storage | Files stored in backend, referenced by conversation_id |
+**File Context (Phase 6):** Users upload documents (PDF, DOCX, plain text) as context for their conversations. The Commentator is aware of the uploaded material and factors it into observations. Maximum file size is 10MB with server-side type validation.
 
-### Phase 7: Spaces
-**Goal**: Organize conversations into workspaces (like Arc browser spaces or Slack channels).
+**Spaces (Phase 7):** Conversations organized into workspaces, with optional persistent context per space. A "Legal review" space could carry standing instructions about tone and format that apply to every conversation within it. The system can auto-suggest groupings based on conversation topics.
 
-| Feature | Details |
-|---|---|
-| Auto-suggest | System suggests grouping based on conversation topics |
-| Manual CRUD | Create, rename, delete spaces |
-| Space sidebar | Conversations grouped under spaces in the sidebar |
-| Space-level context | Optional persistent context per space (e.g., "This space is for Python projects") |
-| Default space | "General" space for ungrouped conversations |
+**Authentication and Polish (Phase 8):** User accounts via GitHub OAuth and email magic link, an Apple-style guided onboarding flow, animations that communicate state rather than decorate it, keyboard shortcuts, responsive layout for mobile, and user settings for commentator verbosity and default mode.
 
-### Phase 8: Polish & Auth
-**Goal**: Production-quality UX and user accounts.
+**Deployment-Ready (Phase 9):** Production deployment on Vercel (frontend) and Railway (backend), a demo mode with pre-loaded example conversations, basic usage analytics, and graceful degradation when upstream AI services are unavailable.
 
-| Feature | Details |
-|---|---|
-| Authentication | NextAuth.js v5 — GitHub OAuth + email magic link + guest sessions |
-| Onboarding | Apple-style guided flow (5 screens: intro → meet commentator → two modes → try it → done) |
-| Animations | Smooth transitions between modes, panel expand/collapse, message appear |
-| Responsive | Mobile-friendly layout (panel becomes bottom sheet on mobile) |
-| Loading states | Skeleton screens, proper error boundaries |
-| Keyboard shortcuts | Cmd+K command palette, Cmd+N new conversation, Cmd+/ toggle panel |
-| Settings | Theme preference, commentator verbosity, default mode |
+### Medium Term
 
-### Phase 9: Demo-Ready
-**Goal**: Deployable, shareable, impressive demo.
+**Multi-Model Support (Phase 10):** Users select their AI provider for the main chat from OpenAI, Anthropic, Google, DeepSeek, or a local model via Ollama. Users may bring their own API keys. The Commentator model is configurable separately, allowing organizations to pin it to a specific provider for cost or compliance reasons.
 
-| Feature | Details |
-|---|---|
-| Deployment | Vercel (frontend) + Railway (backend) |
-| Demo mode | Pre-loaded example conversations showcasing both modes |
-| Landing page | Marketing page explaining the concept (separate from app) |
-| Analytics | Basic usage tracking (conversations created, modes used, nudges triggered) |
-| Error handling | Graceful degradation when LLM is down or rate-limited |
-| Performance | Optimize SSE connections, lazy-load sidebar conversations |
+**Prompt Library (Phase 11):** Refined prompts from workshops are saveable to a personal library, searchable, and reusable as quick-starts for future conversations. A curated set of organization-level templates can be managed by administrators.
 
-### Phase 10: Multi-Model Support
-**Goal**: Users choose their LLM provider for main chat.
-
-| Feature | Details |
-|---|---|
-| Provider selection | OpenAI, Anthropic, DeepSeek, Google, local (Ollama) |
-| BYO API key | Users can input their own API keys |
-| Model picker | Per-conversation or global default |
-| Commentator model | TBD — either always cheapest or user-configurable |
-| Provider abstraction | Backend service layer already designed for this (OpenAI SDK compatible) |
-
-### Phase 11: Prompt Library & Templates
-**Goal**: Save, share, and reuse refined prompts.
-
-| Feature | Details |
-|---|---|
-| Save prompts | "Save this prompt" after workshop refinement |
-| Personal library | Searchable list of saved prompts |
-| Community templates | Curated prompt templates by task type |
-| Quick-start | Select a template to pre-fill the chat or workshop |
-| Version history | Track how a prompt evolved through iterations |
-
-### Phase 12: Analytics & Insights
-**Goal**: Help users see their improvement over time.
-
-| Feature | Details |
-|---|---|
-| Prompt score trends | Track composite scores over time |
-| Common patterns | "You frequently forget to specify audience" |
-| Usage stats | Conversations, messages, modes used, nudges engaged |
-| Commentator impact | Before/after comparison when workshop was used |
-| Export | Download analytics as PDF or CSV |
+**Analytics and Coaching Insights (Phase 12):** Prompt quality trends over time per user, pattern identification ("You frequently omit audience specification in writing tasks"), session depth metrics, and exportable reports for team leads. This phase represents the enterprise analytics offering and is likely gated behind a paid tier.
 
 ---
 
 ## 7. Competitive Positioning
 
-### The landscape
+The AI workspace market contains two categories of competing products. The first category is general-purpose AI chat products: ChatGPT, Claude.ai, Gemini. These products have strong model quality but no coaching layer. They respond to whatever they receive without helping users improve the quality of what they send.
 
-```
-                    Integrated ←────────────────→ Separate Tool
-                         │                              │
-              Averroes ──┤                              ├── PromptPerfect
-                         │                              ├── PromptBase
-                         │                              ├── FlowGPT
-                         │                              │
-    Real-time coaching ──┤                              │
-                         │                              │
-                         │              Static templates ├── Prompt libraries
-                         │                              ├── Awesome ChatGPT Prompts
-```
+The second category is prompt tooling: prompt libraries, prompt optimizers, and prompt engineering courses. These products address the right problem but solve it outside the workflow. They require users to stop their work, consult an external resource, and return. Adoption is low because the friction is high and the connection to the task at hand is abstract.
 
-### Why Averroes wins
+Averroes occupies a position neither category has claimed: a full AI workspace where coaching is integrated into the conversation, not adjacent to it. The coaching happens at the moment of action, is specific to the task in front of the user, and requires no behavior change to receive.
 
-| vs. | Averroes Advantage |
-|---|---|
-| **ChatGPT / Claude.ai** | They don't coach. They respond. Averroes adds a coaching layer that makes every interaction better. |
-| **Prompt libraries** | Static. Don't adapt to your specific context, topic, or skill level. Averroes coaches in real-time. |
-| **Prompt optimizers** | Separate workflow. Averroes is integrated — coaching happens inside the conversation, not outside it. |
-| **Courses / guides** | Knowledge decays. Averroes coaches at the point of action, every time. Learning by doing. |
-| **Custom instructions** | One-size-fits-all. Averroes adapts per-message based on what you're actually trying to do. |
-
-### The moat
-
-1. **Integration** — coaching inside the conversation is fundamentally better than a separate tool
-2. **Zero-cost heuristics** — most coaching is free (client-side), making it viable at scale
-3. **Observer architecture** — separate LLM stream means honest, unbiased coaching
-4. **Progressive disclosure** — beginners get workshops, experts get nudges, same product
+The architectural advantage that makes this defensible is the observer model. Because The Commentator is a separate stream with its own context, it can give honest feedback about what the user is actually doing rather than what the main AI would like to do. A model coaching itself will not tell the user that their prompt is weak, because doing so implies the response will be weak. A separate observer has no such conflict.
 
 ---
 
-## 8. Distribution Strategy
+## 8. Enterprise Deployment Model
 
-### Dual model: Hosted SaaS + Open Source
+Averroes is designed to support three deployment patterns for enterprise buyers.
 
-| Channel | Details |
-|---|---|
-| **Hosted SaaS** | Primary. Users sign up, get instant access. Managed infrastructure. |
-| **Open Source** | Self-host option via Docker. Full feature parity. Community contributions. |
-| **Enterprise** | Hosted or on-prem. Team management, SSO, usage analytics, custom prompts. |
+**Hosted SaaS** is the fastest path to adoption. Organizations provision access through an admin portal, and users sign in with existing credentials via SSO. No infrastructure work is required.
 
-### Why open source matters
-- Builds trust (users can inspect coaching logic)
-- Community contributions to nudge heuristics
-- Enterprise adoption (security teams want to review code)
-- Developer ecosystem (custom commentator plugins, model integrations)
+**Private cloud deployment** is available for organizations with data residency requirements. The application ships as a containerized stack and can be deployed into any cloud environment the organization already uses. Conversation data never leaves the organization's infrastructure.
+
+**On-premises deployment** is the maximum-control option. The full application, including the AI model layer, can be operated on internal infrastructure using self-hosted or on-premises models. This option eliminates all external data dependencies and is appropriate for regulated industries or high-security environments.
+
+Enterprise contracts include team management, SSO integration (SAML 2.0 and OIDC), audit logs, usage reporting by team, and the ability to configure organization-level defaults for commentator behavior and AI model selection.
 
 ---
 
-## 9. Monetization (TBD — Flexible Framework)
+## 9. Security and Privacy
 
-Monetization model is intentionally undecided. The architecture supports multiple approaches:
+Security requirements are embedded in the architecture rather than applied after the fact.
 
-### Option A: Freemium SaaS
-| Tier | What You Get |
-|---|---|
-| Free | X conversations/month, basic commentator, 1 model |
-| Pro | Unlimited, all models, prompt library, analytics |
-| Team | Multi-user, shared spaces, admin dashboard |
+All AI output is sanitized before rendering to prevent cross-site scripting. API keys are stored as platform secrets and are never present in the codebase or configuration files. Input validation runs on both the frontend (TypeScript schema validation) and the backend (Pydantic models) for defense in depth. All API endpoints are rate-limited. All database queries are scoped to the authenticated user, with no cross-user data access possible. File uploads are validated server-side against a whitelist of permitted types and a hard size limit.
 
-### Option B: BYO API Key
-| Tier | What You Get |
-|---|---|
-| Free | Coaching layer is free, user provides their own LLM API keys |
-| Pro | Managed API keys, prompt library, analytics, priority support |
+For organizations that deploy on-premises, conversation data never leaves their infrastructure by design. There are no third-party analytics or telemetry calls on conversation content.
 
-### Option C: Open Core
-| Tier | What You Get |
-|---|---|
-| Open Source | Full app, self-hosted, community support |
-| Cloud | Managed hosting, backups, team features, SLA |
-| Enterprise | On-prem, SSO, audit logs, dedicated support |
-
-### Decision criteria (to be evaluated)
-- User research on willingness to pay
-- Cost per user at scale (LLM API costs)
-- Competitive pricing landscape
-- Enterprise demand signals
+The codebase is open source. Enterprise security teams can review the full application logic, coaching prompts, and data handling before deployment. This transparency is a deliberate design choice, not an afterthought.
 
 ---
 
-## 10. Design Principles
+## 10. Success Metrics
 
-### Product principles
-1. **Coaching, not blocking** — Commentator never prevents the user from doing what they want. Nudges are suggestions, not gates.
-2. **Zero-cost by default** — Most coaching is heuristic (free). LLM calls only when the user explicitly engages.
-3. **Progressive disclosure** — New users see more guidance. Power users see less. The product adapts.
-4. **Observer integrity** — The Commentator is separate from the main LLM. It can be honest because it has no stake in the response.
-5. **Speed over perfection** — A fast nudge that's 80% right is better than a slow analysis that's 99% right.
+The primary measure of Averroes's value is prompt quality improvement over time. A user's composite prompt score, calculated by the heuristic engine across five dimensions, should trend upward as they continue using the product. This is the metric that demonstrates the coaching layer is working.
 
-### Design principles
-1. **Apple-quality aesthetics** — Linear + Claude.ai feel. Scholarly, intellectual, precise.
-2. **Theme = mode** — Light/blue = Freestyle. Dark/red = 0→1. The color IS the UX cue.
-3. **Less is more** — Panel shows what's relevant, hides what's not. No clutter.
-4. **Motion with purpose** — Animations communicate state changes, not decoration.
-5. **Typography first** — Content-heavy product. Readability is paramount.
+Supporting metrics include workshop completion rate (the percentage of 0 to 1 sessions that produce a refined prompt sent to main chat), commentator engagement rate (the percentage of sessions where a user responds to The Commentator rather than ignoring it), seven-day return rate (a proxy for whether users found the experience worth repeating), and session depth (average messages per conversation, which indicates whether users are doing substantive work rather than one-off queries).
 
-### Technical principles
-1. **Separation of concerns** — Frontend knows nothing about LLM providers.
-2. **Repository pattern** — Swap databases by changing one file.
-3. **SSE for streaming** — Real-time feel for both chat and commentator.
-4. **Client-side heuristics** — Nudge engine runs in the browser. No network latency.
-5. **Comments everywhere** — Every section of code is commented. Future contributors can understand intent.
+For enterprise accounts, the relevant metrics shift toward team-level reporting: average prompt quality by team, distribution of mode usage across skill levels, coaching engagement rates by department, and prompt library adoption. These are the metrics that justify renewal and expansion.
 
 ---
 
-## 11. Security & Privacy
+## 11. Open Questions for Stakeholder Input
 
-| Concern | Approach |
-|---|---|
-| **LLM output sanitization** | All output sanitized via `nh3` before rendering (XSS prevention) |
-| **API keys** | Platform secrets only. Never in repo. BYO keys encrypted at rest. |
-| **Input validation** | Zod (frontend) + Pydantic (backend) on all inputs |
-| **Rate limiting** | All API endpoints rate-limited |
-| **Data scoping** | All DB queries scoped by user_id. No cross-user data leaks. |
-| **File uploads** | 10MB max, MIME type whitelist, server-side validation |
-| **Self-host privacy** | Open-source option means data never leaves user's infrastructure |
-| **Conversation data** | Stored locally (SQLite). No third-party analytics on conversation content. |
+Several decisions are deferred pending stakeholder alignment and early usage data.
 
----
+The monetization model is not yet determined. Three options are viable: freemium SaaS with a paid tier for analytics and library features, a bring-your-own-API-key model where the coaching layer is free and users pay only for AI usage, or an open-core model where self-hosted deployment is free and managed cloud hosting is paid. The right choice depends on enterprise buyer preferences and the cost structure of the AI layer at scale.
 
-## 12. Success Metrics
+The question of cross-session memory is open. Should The Commentator remember patterns from previous conversations? ("You asked about audience specification three times last week.") This would significantly increase coaching quality for returning users but introduces data retention complexity.
 
-### North star
-**Prompt quality improvement** — measurable increase in prompt scores over time for returning users.
+Real-time collaboration is a medium-term question for enterprise use cases. Multiple users sharing a conversation with a shared Commentator view would support use cases like pair programming or collaborative document drafting.
 
-### Leading indicators
-| Metric | What It Measures |
-|---|---|
-| Nudge engagement rate | % of nudges users click/engage with (signals relevance) |
-| Workshop completion rate | % of 0→1 sessions that produce a refined prompt |
-| Return usage | % of users who come back within 7 days |
-| Mode distribution | Freestyle vs 0→1 usage (signals user maturity) |
-| Commentator conversation rate | % of sessions where user talks to commentator |
-
-### Lagging indicators
-| Metric | What It Measures |
-|---|---|
-| Prompt score trend | Average score improvement per user over time |
-| Session depth | Messages per conversation (are people doing real work?) |
-| Activation rate | % of signups who complete onboarding + first meaningful conversation |
-| NPS / satisfaction | Would you recommend Averroes? |
+Commentator personality is a potential enterprise differentiator. Organizations could configure The Commentator's coaching style: directive, Socratic, or supportive. Different use cases and team cultures may benefit from different approaches.
 
 ---
 
-## 13. Open Questions
+## 12. Principles
 
-These are decisions that need to be made as the product matures:
+The product is built on five principles that govern every decision about scope, design, and architecture.
 
-| Question | Context | When to Decide |
-|---|---|---|
-| Which LLM for commentator at scale? | DeepSeek is cheap but quality matters for coaching | Before multi-model launch |
-| Conversation memory across sessions? | Should commentator remember user's patterns across conversations? | Phase 12 (Analytics) |
-| Real-time collaboration? | Multiple users in one conversation with shared commentator? | Post-MVP, based on enterprise demand |
-| Commentator personality customization? | Let users choose coaching style (strict, gentle, Socratic)? | Phase 8 (Settings) |
-| Mobile-first or responsive? | Native app vs responsive web? | Based on usage data |
-| Offline mode? | Local LLM (Ollama) for fully offline usage? | Phase 10 (Multi-model) |
-| Plugin system? | Custom nudge rules, custom commentator behaviors? | Post-MVP, based on developer demand |
+**Coaching, not blocking.** The Commentator never prevents users from doing what they intend. Observations are offered, never enforced. Users can and should be able to ignore every nudge and still have a functional, valuable AI workspace.
 
----
+**Zero cost by default.** The majority of coaching is heuristic and costs nothing. AI calls are reserved for moments of explicit user engagement. This principle ensures the product is viable at enterprise scale without becoming cost-prohibitive.
 
-## 14. Development Process
+**Observer integrity.** The Commentator's independence from the main AI is not a technical detail. It is the product's core value proposition. A coach who benefits from the conversation they are coaching cannot give honest feedback.
 
-### Branching & releases
-- `main` — stable, deployable
-- `dev` — active development
-- Feature branches off `dev` for each phase/feature
-- Merge to `main` only when phase is complete and tested
+**Progressive disclosure.** Beginners see more intervention. Advanced users see less. The product adapts to the user's demonstrated skill level rather than applying a uniform experience to everyone.
 
-### Code conventions
-- TypeScript strict mode (frontend)
-- Pydantic models for all API contracts (backend)
-- Repository pattern for all database access
-- Components organized by feature (`components/chat/`, `components/commentator/`, etc.)
-- System prompts in `backend/app/prompts/`
-- All API errors return structured JSON
-- No `any` types in TypeScript
-- Comments explaining every section of code
-- Inline styles preferred over Tailwind v4 theme variables
-
-### Testing strategy
-| Layer | Approach |
-|---|---|
-| Frontend components | Manual testing during development (automated tests in Phase 8) |
-| Backend API | Manual testing via Swagger UI + curl (automated tests in Phase 8) |
-| Nudge engine | Unit tests for heuristic rules |
-| E2E flows | Manual walkthrough of both modes after each phase |
-| LLM quality | Manual evaluation of commentator output relevance |
-
-### Documentation
-- `CLAUDE.md` — Architecture and conventions (for AI assistants)
-- `PRD.md` — This document (product vision, roadmap, specs)
-- `PICKUP.md` — Session-level change log (for resuming work)
-- Code comments — Inline documentation in every file
+**Speed over perfection.** A nudge that is eighty percent accurate and arrives immediately is more valuable than an analysis that is perfect but arrives after the user has moved on. Latency in coaching is as damaging as latency in the main chat.
 
 ---
+
+*For questions about this document, the product roadmap, or enterprise deployment options, contact the product team.*
