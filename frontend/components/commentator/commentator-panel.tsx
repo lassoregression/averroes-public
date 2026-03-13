@@ -546,11 +546,10 @@ function FeedItem({
         )}
 
         {/* ── Refined Prompt Artifact ──────────────────────────────────────
-            Visually separate from the observation — elevated document card.
-            Only renders after streaming completes and server has extracted
-            the prompt. Source of truth is message.refinedPrompt, never
-            parsed from raw streamed text. */}
-        {!isStreaming && refinedPrompt && (
+            Card shell appears mid-stream the moment ---PROMPT--- is detected,
+            showing shimmer skeleton lines. When streaming ends and the server
+            sends the extracted prompt, content fades in — no pop. */}
+        {(isStreaming ? message.content.includes("---PROMPT---") : !!refinedPrompt) && (
           <div className="animate-fade-in" style={{
             borderRadius: 12,
             background: "rgba(255, 255, 255, 0.97)",
@@ -578,17 +577,26 @@ function FeedItem({
               </span>
             </div>
 
-            {/* Prompt text */}
-            <div style={{
-              padding: "12px 14px",
-              fontSize: 13, lineHeight: 1.65,
-              color: "#111827",
-              whiteSpace: "pre-wrap",
-            }}>
-              {refinedPrompt}
+            {/* Prompt text — shimmer skeleton while streaming, real content when done */}
+            <div style={{ padding: "12px 14px" }}>
+              {isStreaming ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div className="shimmer-block" style={{ height: 11, width: "95%", background: "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 75%)", backgroundSize: "200% 100%", animation: "shimmer-sweep 1.5s ease-in-out infinite" }} />
+                  <div className="shimmer-block" style={{ height: 11, width: "80%", background: "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 75%)", backgroundSize: "200% 100%", animation: "shimmer-sweep 1.5s ease-in-out infinite" }} />
+                  <div className="shimmer-block" style={{ height: 11, width: "65%", background: "linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 75%)", backgroundSize: "200% 100%", animation: "shimmer-sweep 1.5s ease-in-out infinite" }} />
+                </div>
+              ) : (
+                <div className="animate-fade-in" style={{
+                  fontSize: 13, lineHeight: 1.65,
+                  color: "#111827", whiteSpace: "pre-wrap",
+                }}>
+                  {refinedPrompt}
+                </div>
+              )}
             </div>
 
-            {/* Use in chat CTA */}
+            {/* Use in chat CTA — only shown when content is ready */}
+            {!isStreaming && refinedPrompt && (
             <div style={{
               padding: "8px 12px 10px",
               borderTop: "1px solid rgba(0, 0, 0, 0.06)",
@@ -620,6 +628,7 @@ function FeedItem({
                 </svg>
               </button>
             </div>
+            )}
           </div>
         )}
       </div>
