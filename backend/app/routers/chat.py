@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.models.schemas import ChatRequest, MessageOut
 from app.services.llm import stream_chat, chat
 from app.prompts.assistant import build_assistant_prompt
-from app.repositories.conversation import conversation_repo, message_repo
+from app.repositories.conversation import conversation_repo, message_repo, file_repo
 from app.middleware.rate_limit import rate_limiter
 from app.middleware.sanitize import sanitize_llm_output
 
@@ -33,7 +33,8 @@ async def stream_chat_endpoint(req: ChatRequest):
     # Build context
     messages = await message_repo.list_for_conversation(req.conversation_id)
     chat_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
-    system_prompt = build_assistant_prompt()  # TODO: pass files
+    files = await file_repo.list_for_conversation(req.conversation_id)
+    system_prompt = build_assistant_prompt(files=files or None)
 
     async def event_stream():
         full_response = ""

@@ -378,3 +378,23 @@ export async function rateCoaching(
 export async function healthCheck(): Promise<{ status: string }> {
   return apiFetch("/health");
 }
+
+/* ========================================
+   Files API
+   ======================================== */
+
+/** Upload a file (PDF, DOCX, TXT) and attach it to a conversation */
+export async function uploadFile(conversationId: string, file: File): Promise<FileInfo> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(
+    `${API_BASE}/files/upload?conversation_id=${conversationId}`,
+    { method: "POST", body: formData },
+    // Note: do NOT set Content-Type — browser sets it automatically with multipart boundary
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(body.detail || `Upload error: ${res.status}`);
+  }
+  return res.json();
+}

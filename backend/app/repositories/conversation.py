@@ -200,8 +200,24 @@ class RatingRepository:
             await db.close()
 
 
+class FileRepository:
+
+    async def list_for_conversation(self, conversation_id: str) -> list[dict]:
+        """Fetch all files attached to a conversation (name, file_type, content)."""
+        db = await get_db()
+        try:
+            rows = await db.execute_fetchall(
+                "SELECT name, file_type, content FROM files WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            return [dict(r) for r in rows]
+        finally:
+            await db.close()
+
+
 # Singleton instances
 conversation_repo = ConversationRepository()
 message_repo = MessageRepository()
 coach_message_repo = CoachMessageRepository()
 rating_repo = RatingRepository()
+file_repo = FileRepository()

@@ -17,7 +17,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { WelcomeScreen } from "./welcome-screen";
 import { ChatInput, type ChatInputHandle } from "./chat-input";
 import { MessageBubble } from "./message-bubble";
-import { createConversation, streamChat, getMessages } from "@/lib/api";
+import { createConversation, streamChat, getMessages, uploadFile, type FileInfo } from "@/lib/api";
 import { useTheme } from "@/lib/theme-context";
 import { useCommentator } from "@/lib/commentator-context";
 
@@ -54,6 +54,7 @@ export function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [convoId, setConvoId] = useState<string | null>(initialConvoId);
+  const [attachedFiles, setAttachedFiles] = useState<FileInfo[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
 
@@ -207,6 +208,33 @@ export function ChatPanel({
     }
   }, [convoId, mode, workshopComplete, signalPendingCommentary, runResponseAnalysis, messages]);
 
+  /** Handle file attachment — creates conversation first if needed, then uploads */
+  const handleFileAttach = useCallback(async (file: File) => {
+    let activeConvoId = convoId;
+    if (!activeConvoId) {
+      try {
+        const convo = await createConversation(mode === "zero_to_one" ? "zero_to_one" : "regular");
+        activeConvoId = convo.id;
+        setConvoId(activeConvoId);
+        window.history.replaceState(null, "", `/c/${activeConvoId}`);
+      } catch {
+        return;
+      }
+    }
+    try {
+      const uploaded = await uploadFile(activeConvoId, file);
+      setAttachedFiles((prev) => [...prev, uploaded]);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      alert(msg);
+    }
+  }, [convoId, mode]);
+
+  /** Remove an attached file from local state (file stays in DB but won't affect new messages) */
+  const handleFileRemove = useCallback((fileId: string) => {
+    setAttachedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  }, []);
+
   return (
     <div style={{
       flex: 1, display: "flex", flexDirection: "column", minHeight: 0,
@@ -257,7 +285,14 @@ export function ChatPanel({
 
       {/* ===== CHAT INPUT =====
           Always pinned to the bottom of the panel */}
-      <ChatInput ref={chatInputRef} onSubmit={handleSend} isLoading={isLoading} />
+      <ChatInput
+        ref={chatInputRef}
+        onSubmit={handleSend}
+        isLoading={isLoading}
+        attachedFiles={attachedFiles}
+        onFileAttach={handleFileAttach}
+        onFileRemove={handleFileRemove}
+      />
     </div>
   );
 }

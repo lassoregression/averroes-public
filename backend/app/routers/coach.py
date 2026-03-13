@@ -13,6 +13,7 @@ from app.repositories.conversation import (
     message_repo,
     coach_message_repo,
     rating_repo,
+    file_repo,
 )
 from app.middleware.rate_limit import rate_limiter
 from app.middleware.sanitize import sanitize_llm_output
@@ -72,7 +73,9 @@ async def coach_respond(req: CoachRequest):
     prior_coach = [c for c in all_coach if c["coach_type"] in ("auto", "manual")]
     commentator_messages = prior_coach[-4:] if is_auto else prior_coach[-10:]
 
+    files = await file_repo.list_for_conversation(req.conversation_id)
     system_prompt = build_coach_prompt(
+        files=files or None,
         conversation_messages=conv_messages,
         workshop_messages=workshop_messages,
         commentator_messages=commentator_messages,
@@ -145,7 +148,8 @@ async def workshop_respond(req: CoachRequest):
 
     ws_messages.append({"role": "user", "content": req.message})
 
-    system_prompt = build_workshop_prompt()
+    files = await file_repo.list_for_conversation(req.conversation_id)
+    system_prompt = build_workshop_prompt(files=files or None)
 
     async def event_stream():
         full_response = ""
