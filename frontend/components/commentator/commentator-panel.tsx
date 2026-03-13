@@ -604,7 +604,7 @@ function FeedItem({
                   fontSize: 13, lineHeight: 1.65,
                   color: "#111827", whiteSpace: "pre-wrap",
                 }}>
-                  {refinedPrompt
+                  {(refinedPrompt ?? "")
                     .replace(/\*\*(.+?)\*\*/g, "$1")   /* bold */
                     .replace(/\*(.+?)\*/g, "$1")        /* italic */
                     .replace(/^#{1,6}\s+/gm, "")        /* headings */
