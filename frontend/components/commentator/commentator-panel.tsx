@@ -555,14 +555,21 @@ function FeedItem({
           </div>
         )}
 
-        {/* Refined prompt card — distinct cell, only shown when a prompt was extracted */}
-        {refinedPrompt && !isStreaming && (
-          <div style={{
-            padding: "10px 12px", borderRadius: 12,
-            background: "rgba(0, 0, 0, 0.3)",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            fontSize: 13, lineHeight: 1.6, color: "#ffffff",
-          }}>
+        {/* Refined prompt card — appears as skeleton the moment ---PROMPT--- is
+            detected mid-stream, then fades in real content when complete */}
+        {(isStreaming
+          ? cleanContent.includes("---PROMPT---")
+          : !!refinedPrompt
+        ) && (
+          <div
+            className="animate-fade-in"
+            style={{
+              padding: "10px 12px", borderRadius: 12,
+              background: "rgba(0, 0, 0, 0.3)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              fontSize: 13, lineHeight: 1.6, color: "#ffffff",
+            }}
+          >
             {/* Label */}
             <div style={{
               fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
@@ -572,37 +579,48 @@ function FeedItem({
             }}>
               Refined prompt
             </div>
-            {/* The actual prompt text */}
-            <div style={{ color: "rgba(255, 255, 255, 0.95)" }}>
-              {refinedPrompt}
-            </div>
-            {/* "Use in chat" button — only here, on the prompt card */}
-            <button
-              onClick={() => onUsePrompt(refinedPrompt)}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                marginTop: 8, padding: "6px 14px",
-                borderRadius: 8,
-                border: "1px solid rgba(255, 255, 255, 0.3)",
-                background: "rgba(255, 255, 255, 0.15)",
-                color: "#ffffff",
-                fontSize: 11, fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-              Use in chat
-            </button>
+
+            {/* Skeleton shimmer lines while still streaming, real content when done */}
+            {isStreaming ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div className="shimmer-block" style={{ height: 10, width: "90%" }} />
+                <div className="shimmer-block" style={{ height: 10, width: "75%" }} />
+                <div className="shimmer-block" style={{ height: 10, width: "60%" }} />
+              </div>
+            ) : (
+              <div className="animate-fade-in">
+                <div style={{ color: "rgba(255, 255, 255, 0.95)", marginBottom: 8 }}>
+                  {refinedPrompt}
+                </div>
+                {/* "Use in chat" button */}
+                <button
+                  onClick={() => onUsePrompt(refinedPrompt!)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    marginTop: 0, padding: "6px 14px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                    background: "rgba(255, 255, 255, 0.15)",
+                    color: "#ffffff",
+                    fontSize: 11, fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                  Use in chat
+                </button>
+              </div>
+            )}
           </div>
         )}
 
