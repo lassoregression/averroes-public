@@ -19,7 +19,6 @@ import { useTheme, type CommentatorState } from "@/lib/theme-context";
 import { useCommentator } from "@/lib/commentator-context";
 import type { CommentatorMessage } from "@/lib/commentator-context";
 import type { Nudge } from "@/lib/nudge-engine";
-import ReactMarkdown from "react-markdown";
 
 export function CommentatorPanel() {
   const { mode, commentatorState, setCommentatorState, isPanelOpen, setPanelOpen } = useTheme();
@@ -526,36 +525,22 @@ function FeedItem({
         {/* Observation bubble */}
         {cleanContent && (
           <div
-            className={`markdown-content ${isStreaming ? "streaming-cursor" : ""}`}
+            className={isStreaming ? "streaming-cursor" : ""}
             style={{
               padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
               background: "rgba(0, 0, 0, 0.15)",
               border: "1px solid rgba(255, 255, 255, 0.08)",
               fontSize: 13, lineHeight: 1.5, color: "#ffffff",
+              whiteSpace: "pre-wrap",
             }}
           >
-            {isStreaming ? (
-              <span style={{ whiteSpace: "pre-wrap" }}>{cleanContent}</span>
-            ) : (
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <p style={{ margin: "0 0 6px 0" }}>{children}</p>,
-                  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                  em: ({ children }) => <em>{children}</em>,
-                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 16 }}>{children}</ul>,
-                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 16 }}>{children}</ol>,
-                  li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                  code: ({ children }) => (
-                    <code style={{
-                      background: "rgba(255,255,255,0.1)", padding: "1px 4px",
-                      borderRadius: 3, fontSize: 12,
-                    }}>{children}</code>
-                  ),
-                }}
-              >
-                {cleanContent}
-              </ReactMarkdown>
-            )}
+            {cleanContent
+              .replace(/\*\*(.+?)\*\*/g, "$1")   /* bold */
+              .replace(/\*(.+?)\*/g, "$1")        /* italic */
+              .replace(/^#{1,6}\s+/gm, "")        /* headings */
+              .replace(/^>\s+/gm, "")             /* blockquotes */
+              .replace(/`(.+?)`/g, "$1")          /* inline code */
+              .trim()}
           </div>
         )}
 

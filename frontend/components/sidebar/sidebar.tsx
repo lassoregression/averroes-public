@@ -118,7 +118,8 @@ export function Sidebar() {
         }}
       >
         <button
-          onClick={() => setCollapsed(false)}
+          onClick={handleNewConversation}
+          title="New conversation"
           style={{
             width: 30, height: 30, borderRadius: 8,
             background: "#6366f1", border: "none", cursor: "pointer",
@@ -147,7 +148,15 @@ export function Sidebar() {
         padding: "0 16px", height: 52, borderBottom: "1px solid #1a1a1a",
         flexShrink: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button
+          onClick={handleNewConversation}
+          title="New conversation"
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            background: "none", border: "none", cursor: "pointer", padding: 0,
+            color: "#fff",
+          }}
+        >
           <div style={{
             width: 28, height: 28, borderRadius: 8,
             background: "#6366f1", display: "flex",
@@ -155,7 +164,7 @@ export function Sidebar() {
             fontSize: 12, fontWeight: 700,
           }}>A</div>
           <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em" }}>Averroes</span>
-        </div>
+        </button>
         <button
           onClick={() => setCollapsed(true)}
           style={{
