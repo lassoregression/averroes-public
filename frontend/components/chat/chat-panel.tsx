@@ -208,7 +208,9 @@ export function ChatPanel({
     }
   }, [convoId, mode, workshopComplete, signalPendingCommentary, runResponseAnalysis, messages]);
 
-  /** Handle file attachment — creates conversation first if needed, then uploads */
+  /** Handle file attachment — creates conversation first if needed, then uploads.
+   *  In 0→1 mode: auto-triggers the workshop about the attached document so the
+   *  commentator opens the conversation ("I see you've attached X — let's build a prompt for it"). */
   const handleFileAttach = useCallback(async (file: File) => {
     let activeConvoId = convoId;
     if (!activeConvoId) {
@@ -224,11 +226,17 @@ export function ChatPanel({
     try {
       const uploaded = await uploadFile(activeConvoId, file);
       setAttachedFiles((prev) => [...prev, uploaded]);
+
+      /* In 0→1 mode, automatically kick off the workshop with the file as the starting context.
+         The commentator will open with questions about what the user wants to do with the doc. */
+      if (mode === "zero_to_one") {
+        sendToWorkshop(`I've attached "${file.name}" — help me craft a prompt around it.`);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Upload failed";
       alert(msg);
     }
-  }, [convoId, mode]);
+  }, [convoId, mode, sendToWorkshop]);
 
   /** Remove an attached file from local state (file stays in DB but won't affect new messages) */
   const handleFileRemove = useCallback((fileId: string) => {
