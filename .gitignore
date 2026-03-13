@@ -41,6 +41,24 @@ htmlcov/
 # Misc
 *.log
 
-# ngrok — if you customize ngrok.yml locally (e.g. add authtoken), keep it out of git
-# ngrok.yml is checked in with safe defaults, but override files should not be
+# ngrok
+ngrok.yml
 ngrok.local.yml
+
+# Docker (local only)
+docker-compose.yml
+frontend/Dockerfile
+backend/Dockerfile
+
+# Internal project notes
+CLAUDE.md
+PICKUP.md
+PRD.md
+TEST_FLOWS.md
+TRIED-AND-TESTED.md
+
+# Local npm config workaround
+frontend/.npmrc
+
+# TypeScript build info
+*.tsbuildinfo
