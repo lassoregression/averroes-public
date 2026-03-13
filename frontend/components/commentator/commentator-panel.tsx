@@ -32,6 +32,7 @@ export function CommentatorPanel() {
     sendToWorkshop,
     setRefinedPrompt,
     workshopComplete,
+    workshopPrompt,
   } = useCommentator();
   const [inputValue, setInputValue] = useState("");
   /* Tracks whether user clicked "Talk to Commentator" — shows the input field */
@@ -206,9 +207,16 @@ export function CommentatorPanel() {
         )}
 
         {/* Render each feed item (skip empty streaming commentator messages — shimmer handles those) */}
-        {feed.map((msg) => {
+        {feed.map((msg, index) => {
           /* Hide empty streaming commentator messages — PanelThinkingState covers this state */
           if (msg.type === "commentator" && msg.isStreaming && msg.content === "") return null;
+          /* If the workshop is complete, pass workshopPrompt as a reliable override to the
+             last commentator message — avoids the card being absent if delimiter parsing fails */
+          const isLastCommentator =
+            workshopComplete &&
+            workshopPrompt &&
+            msg.type === "commentator" &&
+            feed.slice(index + 1).every((m) => m.type !== "commentator");
           return (
             <FeedItem
               key={msg.id}
@@ -216,6 +224,7 @@ export function CommentatorPanel() {
               onNudgeClick={handleNudgeClick}
               onUsePrompt={handleUsePrompt}
               isStreaming={msg.isStreaming}
+              workshopPromptOverride={isLastCommentator ? workshopPrompt : undefined}
             />
           );
         })}
@@ -416,11 +425,13 @@ function FeedItem({
   onNudgeClick,
   onUsePrompt,
   isStreaming,
+  workshopPromptOverride,
 }: {
   message: CommentatorMessage;
   onNudgeClick: (nudge: Nudge) => void;
   onUsePrompt: (text: string) => void;
   isStreaming?: boolean;
+  workshopPromptOverride?: string | null;
 }) {
   /* Nudge cards — white on transparent, actionable */
   if (message.type === "nudge" && message.nudge) {
@@ -485,9 +496,11 @@ function FeedItem({
     /* Strip [WORKSHOP_READY] marker from displayed text */
     const cleanContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
 
-    /* Parse out refined prompt if wrapped in ---PROMPT--- / ---END--- delimiters */
+    /* Parse out refined prompt if wrapped in ---PROMPT--- / ---END--- delimiters.
+       Fall back to workshopPromptOverride (from context) if delimiter parsing fails —
+       ensures the card always renders when the workshop completes. */
     const promptMatch = cleanContent.match(/---PROMPT---\s*([\s\S]*?)\s*---END---/);
-    const refinedPrompt = promptMatch ? promptMatch[1].trim() : null;
+    const refinedPrompt = workshopPromptOverride || (promptMatch ? promptMatch[1].trim() : null);
     /* Commentary is everything outside the delimiters.
        During streaming, strip partial/complete delimiter markers so they don't
        show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives).

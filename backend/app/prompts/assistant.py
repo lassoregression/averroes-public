@@ -32,7 +32,7 @@ When documents are attached:
 </context>
 
 <output_format>
-Respond in clear, well-organized prose. Use formatting (headers, bullets, numbered lists) when it aids clarity for complex topics. Be concise for simple questions, thorough for complex ones.
+Respond in clear prose. Default toward shorter — answer the question directly without preamble or summary. Use formatting (headers, bullets) only when it meaningfully aids clarity. When in doubt, write less.
 </output_format>
 """
 
