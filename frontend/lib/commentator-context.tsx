@@ -35,6 +35,8 @@ export interface CommentatorMessage {
   timestamp: Date;
   nudge?: Nudge;
   isStreaming?: boolean;
+  /** Server-extracted refined prompt — set on done event, avoids client-side regex parsing */
+  refinedPrompt?: string | null;
 }
 
 interface CommentatorContextValue {
@@ -180,7 +182,9 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
           } else if (event.type === "done") {
             setActiveMessages((prev) =>
               prev.map((m) =>
-                m.id === commentatorId ? { ...m, isStreaming: false } : m,
+                m.id === commentatorId
+                  ? { ...m, isStreaming: false, refinedPrompt: event.refined_prompt }
+                  : m,
               ),
             );
           } else if (event.type === "error") {
@@ -262,7 +266,9 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
           } else if (event.type === "done") {
             setActiveMessages((prev) =>
               prev.map((m) =>
-                m.id === commentatorId ? { ...m, isStreaming: false } : m,
+                m.id === commentatorId
+                  ? { ...m, isStreaming: false, refinedPrompt: event.refined_prompt }
+                  : m,
               ),
             );
           } else if (event.type === "error") {
@@ -342,29 +348,19 @@ export function CommentatorProvider({ children }: { children: ReactNode }) {
               ),
             );
           } else if (event.type === "done") {
+            /* Store the server-extracted refined prompt on the message — no client-side parsing */
             setActiveMessages((prev) =>
               prev.map((m) =>
-                m.id === commentatorId ? { ...m, isStreaming: false } : m,
+                m.id === commentatorId
+                  ? { ...m, isStreaming: false, refinedPrompt: event.refined_prompt }
+                  : m,
               ),
             );
 
-            /* If workshop says prompt is ready, extract and store as workshopPrompt.
-               User must click "Use in chat" to inject into main chat input.
-               Mode stays in 0→1 — no auto-switching. */
-            if (event.workshop_ready) {
-              setActiveMessages((prev) => {
-                const finalMsg = prev.find((m) => m.id === commentatorId);
-                if (finalMsg) {
-                  /* Extract prompt from ---PROMPT---/---END--- delimiters */
-                  const promptMatch = finalMsg.content.match(/---PROMPT---\s*([\s\S]*?)\s*---END---/);
-                  const extracted = promptMatch
-                    ? promptMatch[1].trim()
-                    : finalMsg.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
-                  setWorkshopPrompt(extracted);
-                  setWorkshopComplete(true);
-                }
-                return prev;
-              });
+            /* Workshop ready — use server-extracted prompt directly */
+            if (event.workshop_ready && event.refined_prompt) {
+              setWorkshopPrompt(event.refined_prompt);
+              setWorkshopComplete(true);
             }
           } else if (event.type === "title") {
             /* Title generated for workshop conversation — notify sidebar */

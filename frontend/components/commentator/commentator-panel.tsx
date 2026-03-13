@@ -207,16 +207,15 @@ export function CommentatorPanel() {
         )}
 
         {/* Render each feed item (skip empty streaming commentator messages — shimmer handles those) */}
-        {feed.map((msg, index) => {
-          /* Hide empty streaming commentator messages — PanelThinkingState covers this state */
+        {feed.map((msg) => {
           if (msg.type === "commentator" && msg.isStreaming && msg.content === "") return null;
-          /* If the workshop is complete, pass workshopPrompt as a reliable override to the
-             last commentator message — avoids the card being absent if delimiter parsing fails */
-          const isLastCommentator =
-            workshopComplete &&
-            workshopPrompt &&
-            msg.type === "commentator" &&
-            feed.slice(index + 1).every((m) => m.type !== "commentator");
+          /* Pass workshopPrompt as fallback for the last commentator message —
+             covers the edge case where message.refinedPrompt wasn't set but
+             workshopComplete is true (e.g. older messages reloaded from DB) */
+          const workshopFallback =
+            workshopComplete && workshopPrompt && msg.type === "commentator" && !msg.refinedPrompt
+              ? workshopPrompt
+              : undefined;
           return (
             <FeedItem
               key={msg.id}
@@ -224,7 +223,7 @@ export function CommentatorPanel() {
               onNudgeClick={handleNudgeClick}
               onUsePrompt={handleUsePrompt}
               isStreaming={msg.isStreaming}
-              workshopPromptOverride={isLastCommentator ? workshopPrompt : undefined}
+              workshopPromptOverride={workshopFallback}
             />
           );
         })}
@@ -493,34 +492,27 @@ function FeedItem({
 
   /* Commentator response — left-aligned like a text conversation */
   if (message.type === "commentator") {
-    /* Strip [WORKSHOP_READY] marker from displayed text */
-    const cleanContent = message.content.replace(/\[WORKSHOP_READY\]/g, "").trim();
-
-    /* Parse out refined prompt if wrapped in ---PROMPT--- / ---END--- delimiters.
-       Fall back to workshopPromptOverride (from context) if delimiter parsing fails —
-       ensures the card always renders when the workshop completes. */
-    const promptMatch = cleanContent.match(/---PROMPT---\s*([\s\S]*?)\s*---END---/);
-    const refinedPrompt = workshopPromptOverride || (promptMatch ? promptMatch[1].trim() : null);
-    /* Commentary is everything outside the delimiters.
-       During streaming, strip partial/complete delimiter markers so they don't
-       show as raw text (e.g., "---PROM" or "---PROMPT---\n..." before ---END--- arrives).
-       Also strip any "REFINED PROMPT" label the model outputs before the delimiters —
-       it's already represented by the card below, so showing it in the text is redundant. */
-    const commentary = (refinedPrompt
-      ? cleanContent.replace(/---PROMPT---[\s\S]*?---END---/, "")
-      : cleanContent.replace(/---PROMPT---[\s\S]*$/, ""))
+    /* Strip delimiter markers and [WORKSHOP_READY] from visible commentary text.
+       The refined prompt itself is rendered as a separate artifact card below,
+       sourced from message.refinedPrompt (server-extracted, never parsed client-side). */
+    const cleanContent = message.content
+      .replace(/\[WORKSHOP_READY\]/g, "")
+      .replace(/---PROMPT---[\s\S]*?---END---/g, "")
+      .replace(/---PROMPT---[\s\S]*/g, "")           /* strip partial delimiter mid-stream */
       .replace(/\*{0,2}REFINED PROMPT\*{0,2}\s*$/i, "")
       .trim();
+
+    const refinedPrompt = message.refinedPrompt || workshopPromptOverride || null;
 
     return (
       <div className="animate-fade-in" style={{
         maxWidth: "90%",
-        display: "flex", flexDirection: "column", gap: 8,
+        display: "flex", flexDirection: "column", gap: 10,
       }}>
-        {/* Commentary bubble — the conversational part, with markdown support */}
-        {commentary && (
+        {/* Observation bubble */}
+        {cleanContent && (
           <div
-            className={`markdown-content ${isStreaming && !refinedPrompt ? "streaming-cursor" : ""}`}
+            className={`markdown-content ${isStreaming ? "streaming-cursor" : ""}`}
             style={{
               padding: "8px 12px", borderRadius: "14px 14px 14px 4px",
               background: "rgba(0, 0, 0, 0.15)",
@@ -529,10 +521,8 @@ function FeedItem({
             }}
           >
             {isStreaming ? (
-              /* Plain text during streaming to avoid mid-token markdown glitches */
-              <span style={{ whiteSpace: "pre-wrap" }}>{commentary}</span>
+              <span style={{ whiteSpace: "pre-wrap" }}>{cleanContent}</span>
             ) : (
-              /* Full markdown rendering when done */
               <ReactMarkdown
                 components={{
                   p: ({ children }) => <p style={{ margin: "0 0 6px 0" }}>{children}</p>,
@@ -549,84 +539,89 @@ function FeedItem({
                   ),
                 }}
               >
-                {commentary}
+                {cleanContent}
               </ReactMarkdown>
             )}
           </div>
         )}
 
-        {/* Refined prompt card — appears as skeleton the moment ---PROMPT--- is
-            detected mid-stream, then fades in real content when complete */}
-        {(isStreaming
-          ? cleanContent.includes("---PROMPT---")
-          : !!refinedPrompt
-        ) && (
-          <div
-            className="animate-fade-in"
-            style={{
-              padding: "10px 12px", borderRadius: 12,
-              background: "rgba(0, 0, 0, 0.3)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-              fontSize: 13, lineHeight: 1.6, color: "#ffffff",
-            }}
-          >
-            {/* Label */}
+        {/* ── Refined Prompt Artifact ──────────────────────────────────────
+            Visually separate from the observation — elevated document card.
+            Only renders after streaming completes and server has extracted
+            the prompt. Source of truth is message.refinedPrompt, never
+            parsed from raw streamed text. */}
+        {!isStreaming && refinedPrompt && (
+          <div className="animate-fade-in" style={{
+            borderRadius: 12,
+            background: "rgba(255, 255, 255, 0.97)",
+            border: "1px solid rgba(255, 255, 255, 0.6)",
+            boxShadow: "0 4px 24px rgba(0, 0, 0, 0.25), 0 1px 4px rgba(0,0,0,0.15)",
+            overflow: "hidden",
+          }}>
+            {/* Card header */}
             <div style={{
-              fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
-              color: "rgba(255, 255, 255, 0.5)",
-              textTransform: "uppercase",
-              marginBottom: 6,
+              padding: "8px 12px",
+              background: "rgba(0, 0, 0, 0.06)",
+              borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+              display: "flex", alignItems: "center", gap: 6,
             }}>
-              Refined prompt
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="rgba(0,0,0,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" />
+              </svg>
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+                color: "rgba(0, 0, 0, 0.4)",
+                textTransform: "uppercase",
+              }}>
+                Refined Prompt
+              </span>
             </div>
 
-            {/* Skeleton shimmer lines while still streaming, real content when done */}
-            {isStreaming ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div className="shimmer-block" style={{ height: 10, width: "90%" }} />
-                <div className="shimmer-block" style={{ height: 10, width: "75%" }} />
-                <div className="shimmer-block" style={{ height: 10, width: "60%" }} />
-              </div>
-            ) : (
-              <div className="animate-fade-in">
-                <div style={{ color: "rgba(255, 255, 255, 0.95)", marginBottom: 8 }}>
-                  {refinedPrompt}
-                </div>
-                {/* "Use in chat" button */}
-                <button
-                  onClick={() => onUsePrompt(refinedPrompt!)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    marginTop: 0, padding: "6px 14px",
-                    borderRadius: 8,
-                    border: "1px solid rgba(255, 255, 255, 0.3)",
-                    background: "rgba(255, 255, 255, 0.15)",
-                    color: "#ffffff",
-                    fontSize: 11, fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                  Use in chat
-                </button>
-              </div>
-            )}
+            {/* Prompt text */}
+            <div style={{
+              padding: "12px 14px",
+              fontSize: 13, lineHeight: 1.65,
+              color: "#111827",
+              whiteSpace: "pre-wrap",
+            }}>
+              {refinedPrompt}
+            </div>
+
+            {/* Use in chat CTA */}
+            <div style={{
+              padding: "8px 12px 10px",
+              borderTop: "1px solid rgba(0, 0, 0, 0.06)",
+            }}>
+              <button
+                onClick={() => onUsePrompt(refinedPrompt)}
+                style={{
+                  width: "100%", padding: "7px 0",
+                  borderRadius: 8,
+                  border: "1px solid rgba(0, 0, 0, 0.12)",
+                  background: "rgba(0, 0, 0, 0.05)",
+                  color: "#111827",
+                  fontSize: 12, fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(0, 0, 0, 0.05)";
+                }}
+              >
+                Use in chat
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
-
-        {/* No ThinkingIndicator here — in the panel, the commentary text
-           appears naturally as it streams in. Showing a blinking indicator
-           alongside nudge cards clutters the UI. */}
       </div>
     );
   }

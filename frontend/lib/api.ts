@@ -174,6 +174,7 @@ export interface SSEEvent {
   message_id?: string;
   coach_message_id?: string;
   workshop_ready?: boolean;
+  refined_prompt?: string | null;
   message?: string;
   title?: string;
 }

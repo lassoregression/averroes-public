@@ -20,6 +20,27 @@ from app.middleware.sanitize import sanitize_llm_output
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/coach", tags=["coach"])
 
+
+def _extract_refined_prompt(text: str) -> str | None:
+    """Extract refined prompt from model output.
+
+    Tries multiple patterns because the model doesn't always use the exact
+    ---PROMPT---/---END--- delimiters despite being instructed to.
+    """
+    import re
+    # Primary: explicit delimiters
+    match = re.search(r'---PROMPT---\s*([\s\S]*?)\s*---END---', text)
+    if match:
+        return match.group(1).strip()
+    # Fallback: "Refined Prompt:" / "REFINED PROMPT:" header pattern
+    match = re.search(
+        r'\*{0,2}[Rr]efined\s+[Pp]rompt\*{0,2}[:\s]*\n([\s\S]+?)(?:\n\n|\[WORKSHOP_READY\]|$)',
+        text
+    )
+    if match:
+        return match.group(1).strip()
+    return None
+
 DEMO_USER_ID = "demo-user"
 
 
@@ -78,13 +99,14 @@ async def coach_respond(req: CoachRequest):
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
             sanitized = sanitize_llm_output(full_response)
+            refined_prompt_text = _extract_refined_prompt(full_response)
             saved = await coach_message_repo.create(
                 conversation_id=req.conversation_id,
                 coach_type=req.coach_type.value,
                 coach_response=sanitized,
                 user_prompt=req.message,
             )
-            yield f"data: {json.dumps({'type': 'done', 'coach_message_id': saved['id']})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'coach_message_id': saved['id'], 'refined_prompt': refined_prompt_text})}\n\n"
 
         except Exception as e:
             logger.error(f"Coach stream error: {e}")
@@ -133,7 +155,9 @@ async def workshop_respond(req: CoachRequest):
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
             sanitized = sanitize_llm_output(full_response)
-            is_ready = "[WORKSHOP_READY]" in full_response
+            refined_prompt_text = _extract_refined_prompt(full_response)
+            # Consider workshop ready if [WORKSHOP_READY] marker present OR a prompt was extracted
+            is_ready = "[WORKSHOP_READY]" in full_response or refined_prompt_text is not None
 
             saved = await coach_message_repo.create(
                 conversation_id=req.conversation_id,
@@ -142,7 +166,7 @@ async def workshop_respond(req: CoachRequest):
                 user_prompt=req.message,
             )
 
-            yield f"data: {json.dumps({'type': 'done', 'coach_message_id': saved['id'], 'workshop_ready': is_ready})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'coach_message_id': saved['id'], 'workshop_ready': is_ready, 'refined_prompt': refined_prompt_text})}\n\n"
 
             # Generate title after first workshop exchange
             if len(workshop_history) == 0:
