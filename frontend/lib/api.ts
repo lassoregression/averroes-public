@@ -11,7 +11,9 @@
  * - Conversation, space, coach, and file management
  */
 
-const API_BASE = "/api";
+// Call the backend directly to avoid Vercel's 10s serverless timeout on SSE streams.
+// NEXT_PUBLIC_API_URL is set per-environment (Railway URL in prod, localhost in dev).
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
 /* ========================================
    Types — Mirror the backend Pydantic models
