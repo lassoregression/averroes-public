@@ -493,16 +493,30 @@ function FeedItem({
   /* Commentator response — left-aligned like a text conversation */
   if (message.type === "commentator") {
     /* Strip delimiter markers and [WORKSHOP_READY] from visible commentary text.
-       The refined prompt itself is rendered as a separate artifact card below,
-       sourced from message.refinedPrompt (server-extracted, never parsed client-side). */
+       Uses case-insensitive, space-tolerant patterns to handle model variations.
+       The refined prompt is rendered as a separate artifact card below. */
     const cleanContent = message.content
       .replace(/\[WORKSHOP_READY\]/g, "")
-      .replace(/---PROMPT---[\s\S]*?---END---/g, "")
-      .replace(/---PROMPT---[\s\S]*/g, "")           /* strip partial delimiter mid-stream */
-      .replace(/\*{0,2}REFINED PROMPT\*{0,2}\s*$/i, "")
+      /* Complete block: ---PROMPT--- ... ---END--- (case-insensitive, spaces allowed) */
+      .replace(/---\s*PROMPT\s*---[\s\S]*?---\s*END\s*---/gi, "")
+      /* Partial block mid-stream: from ---PROMPT--- to end of string */
+      .replace(/---\s*PROMPT\s*---[\s\S]*/gi, "")
+      /* Orphan closing delimiter (model outputs ---END--- without the opening) */
+      .replace(/---\s*END\s*---/gi, "")
+      /* "REFINED PROMPT:" label and everything after it */
+      .replace(/\*{0,2}REFINED PROMPT\*{0,2}[:\s][\s\S]*/i, "")
       .trim();
 
-    const refinedPrompt = message.refinedPrompt || workshopPromptOverride || null;
+    /* Refined prompt: server-extracted (ideal) → workshop fallback → last-resort
+       client-side extraction (catches cases where server regex missed). */
+    const refinedPrompt = message.refinedPrompt
+      || workshopPromptOverride
+      || (!message.isStreaming
+        ? (() => {
+            const m = message.content.match(/---\s*PROMPT\s*---\s*([\s\S]*?)\s*---\s*END\s*---/i);
+            return m ? m[1].trim() : null;
+          })()
+        : null);
 
     return (
       <div className="animate-fade-in" style={{
@@ -549,7 +563,7 @@ function FeedItem({
             Card shell appears mid-stream the moment ---PROMPT--- is detected,
             showing shimmer skeleton lines. When streaming ends and the server
             sends the extracted prompt, content fades in — no pop. */}
-        {(isStreaming ? message.content.includes("---PROMPT---") : !!refinedPrompt) && (
+        {(isStreaming ? /---\s*PROMPT\s*---/i.test(message.content) : !!refinedPrompt) && (
           <div className="animate-fade-in" style={{
             borderRadius: 12,
             background: "rgba(255, 255, 255, 0.97)",

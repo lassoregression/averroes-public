@@ -25,15 +25,25 @@ router = APIRouter(prefix="/api/coach", tags=["coach"])
 def _extract_refined_prompt(text: str) -> str | None:
     """Extract refined prompt from model output.
 
-    Tries multiple patterns because the model doesn't always use the exact
-    ---PROMPT---/---END--- delimiters despite being instructed to.
+    Tries multiple patterns in order of specificity because the model doesn't
+    always use exact ---PROMPT---/---END--- delimiters despite being instructed to.
     """
     import re
-    # Primary: explicit delimiters
+    # Primary: exact delimiters (strict)
     match = re.search(r'---PROMPT---\s*([\s\S]*?)\s*---END---', text)
     if match:
         return match.group(1).strip()
-    # Fallback: "Refined Prompt:" / "REFINED PROMPT:" header pattern
+    # Variant: allows spaces around keywords and case differences
+    # e.g. "--- PROMPT ---" / "--- End ---"
+    match = re.search(
+        r'---\s*PROMPT\s*---\s*([\s\S]*?)\s*---\s*END\s*---',
+        text,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).strip()
+    # Fallback: "Refined Prompt:" / "REFINED PROMPT:" header — capture until
+    # double newline, [WORKSHOP_READY] marker, or end of string
     match = re.search(
         r'\*{0,2}[Rr]efined\s+[Pp]rompt\*{0,2}[:\s]*\n([\s\S]+?)(?:\n\n|\[WORKSHOP_READY\]|$)',
         text
