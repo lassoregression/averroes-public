@@ -1,100 +1,161 @@
 # Averroes · Prompt coaching for LLM chat
 
-**Subtitle for search:** open-source **prompt coaching** web app: a second model (**The Commentator**) reviews each exchange and proposes sharper prompts; optional **0→1 workshop** for shaping an idea before normal chat; **PDF / DOCX / TXT** context for both sides.
+**Self-hosted web UI:** main assistant chat plus a **Commentator** side panel that reacts after each reply and proposes a **sharpened prompt**. Optional **0→1 workshop** walks from a vague idea to one polished prompt before normal chat. Attach PDF, DOCX, or TXT so both models see extracted text.
+
+Stack: **Next.js**, **FastAPI**, **SQLite** (FTS5 search), **SSE** streaming, **DeepSeek** via an OpenAI-compatible API (bring your own key).
+
+> **Warning:** Put `DEEPSEEK_API_KEY` only on the server (`backend/.env`). Never commit keys or put them in the frontend bundle.
+
+**Try it:** [averroes-llm.vercel.app](https://averroes-llm.vercel.app) (hosted demo; this repo is for running your own copy).
 
 ---
 
 ## What it does
 
-You chat with an assistant as usual. After each reply, **The Commentator** runs as a **separate** model call: it reads the thread (and any uploaded docs), notes what was fuzzy or underspecified, and outputs a **cleaned-up prompt** you can paste back into the main box.
+1. You chat with an assistant like usual (streaming tokens).
+2. After each assistant reply, a **second** model call (the Commentator) reads the exchange and returns a short critique plus a **refined prompt** you can paste back into the main box.
+3. In **workshop** mode, the first turns go through a dedicated dialogue whose job is to land **one** strong prompt, then you continue in normal chat.
 
-**Workshop mode** front-loads a short back-and-forth whose goal is **one** strong prompt, then you switch to regular chat with that foundation.
-
-Everything streams over **SSE**. Stack: **Next.js** UI, **FastAPI** API, **SQLite** (+ FTS search), **DeepSeek** via an OpenAI-compatible HTTP API (bring your own key).
+So the product loop is: write prompt → get answer → get coached → optionally swap in a better prompt → better next answer.
 
 ---
 
 ## Who it is for
 
-- People who already use chat LLMs but want **tighter prompts** without switching to a separate “prompt generator” tool  
-- Builders who want a **forkable** reference for dual-stream UX (main chat + coach)  
-- Anyone evaluating **prompt refinement loops** with **local or self-hosted** data (SQLite, no vendor lock-in on storage)
+- Builders and power users who already hit **lazy or generic answers** when the ask was underspecified.
+- Teams prototyping **prompt-heavy workflows** and wanting a UI pattern they can fork (not a hosted black box).
+- Anyone who wants **file-grounded** coaching (upload a doc; coach + assistant both see a text preview in context).
 
 ---
 
-## How it is different
+## Why it is different
 
 | Typical chat UI | Averroes |
 |-----------------|----------|
-| One model, one thread | Main model **plus** an observer model on a **schedule you define in code** (here: after each assistant turn) |
-| You alone fix vague prompts | The Commentator **names gaps** and emits a **rewrite**, not just encouragement |
-| Single-shot “improve my prompt” widgets | **Workshop** keeps context in-thread until a prompt is ready; attachments feed **both** models |
+| One model, one thread | Two lanes: assistant + Commentator after each turn |
+| You guess why the answer was weak | Panel names gaps and hands you a rewritten prompt |
+| Blank prompt bar for hard tasks | Workshop mode structures the path from fuzzy idea to concrete prompt |
+| Keys in many SaaS dashboards | **Self-hosted**: SQLite on disk, one LLM provider config you control |
 
-This is **not** a general “ChatGPT wrapper”: persistence, coach prompts, and SSE contracts are **first-class** in the repo ([`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)).
-
----
-
-## Live demo
-
-**[averroes-llm.vercel.app](https://averroes-llm.vercel.app)** (hosted build; API is operated by the deployer).
+This is **not** RAG-as-a-product or an agent framework. It is **prompt quality as the feature**: critique + rewrite + optional workshop, with clear SSE APIs if you want to replace the UI later.
 
 ---
 
-## See it (product, not only code)
+## Before / after (concrete)
 
-| Asset | Status |
-|-------|--------|
-| **Screenshots** | Add files under [`docs/images/`](docs/images/) and uncomment the image lines below |
-| **Architecture (diagram)** | Mermaid diagram under [System sketch](#system-sketch) |
-| **Before / after** | [Concrete example](#concrete-example-study-notes) |
+**You send (weak):**
 
-<!-- Uncomment after adding images:
-![Main chat with commentator panel](docs/images/chat-overview.png)
-![Workshop flow](docs/images/workshop-mode.png)
--->
+```text
+write something about rust
+```
 
-**Suggested extras:** a short terminal recording (asciinema or GIF) of install + first message, or a Loom-style walkthrough linked from your repo **About** section.
+**Assistant might answer** with a shallow overview because the task is undefined.
+
+**Commentator aims at a tighter instruction**, for example:
+
+```text
+Draft a 250-word explanation of Rust's ownership and borrow checker for a programmer who knows C++. Include: (1) what problem they solve, (2) one analogy, (3) one common compile error novices hit. No installation steps.
+```
+
+Same underlying model family: clearer constraints usually produce **more useful** completions. The UI exists to surface that rewrite without leaving the thread.
+
+---
+
+## Architecture (two-model loop)
+
+```mermaid
+flowchart TB
+  subgraph client [Browser]
+    NEXT[Next.js app]
+  end
+  subgraph server [FastAPI]
+    CHAT["/api/chat/stream"]
+    COACH["/api/coach/*"]
+    FILES["/api/files/*"]
+    DB[(SQLite)]
+  end
+  DS[DeepSeek API]
+  NEXT <-->|SSE + REST| CHAT
+  NEXT <-->|SSE + REST| COACH
+  NEXT <-->|REST| FILES
+  CHAT --> DB
+  COACH --> DB
+  FILES --> DB
+  CHAT --> DS
+  COACH --> DS
+```
+
+**One exchange end-to-end:**
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant W as Web UI
+  participant A as FastAPI
+  participant L as LLM
+  U->>W: message
+  W->>A: POST /api/chat/stream
+  A->>L: assistant completion
+  L-->>A: tokens
+  A-->>W: SSE chunk ... then done
+  W->>A: POST /api/coach/respond auto
+  A->>L: commentator completion
+  L-->>A: tokens
+  A-->>W: SSE chunk ... done + refined_prompt
+```
+
+More detail (SSE `type` fields, workshop routing): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
 ## 60-second quickstart
 
-Assumes **Python 3.11+**, **Node 20+**, and a **[DeepSeek API key](https://platform.deepseek.com/)**. Run from the **repository root**.
+Prereqs: **Python 3.11+**, **Node 20+**, a [DeepSeek](https://platform.deepseek.com/) API key.
 
 **1. Backend**
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-**Expected:** `pip` finishes with `Successfully installed ...` (versions vary).
-
-Edit `backend/.env` and set:
+Put your key in `backend/.env`:
 
 ```bash
-DEEPSEEK_API_KEY=your_real_key_here
+echo 'DEEPSEEK_API_KEY=sk-your-key-here' > .env
+# or edit .env by hand; keep FRONTEND_URL=http://localhost:3000 for local
 ```
 
-**2. Start API**
+Start API:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Expected (last line similar to):**
+**Expected:** lines like `Uvicorn running on http://127.0.0.1:8000` and `Application startup complete`.
 
-```text
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-```
-
-Quick check:
+**2. Frontend** (new terminal)
 
 ```bash
-curl -s http://127.0.0.1:8000/api/health
+cd frontend
+npm install
+cp .env.example .env.local
+```
+
+Default `.env.local` already targets `http://localhost:8000`. Start UI:
+
+```bash
+npm run dev
+```
+
+**Expected:** Next prints a **Local** URL, usually `http://localhost:3000`.
+
+**3. Sanity check**
+
+```bash
+curl -s http://localhost:8000/api/health
 ```
 
 **Expected:**
@@ -103,92 +164,32 @@ curl -s http://127.0.0.1:8000/api/health
 {"status":"ok","service":"averroes"}
 ```
 
-**3. Frontend (new terminal, repo root)**
+**4. Use it**
 
-```bash
-cd frontend
-npm install
-cp .env.example .env.local
-npm run dev
-```
+Open [http://localhost:3000](http://localhost:3000). Start a conversation, send any message, wait for the assistant stream to finish, then read the **Commentator** panel on the side for the refined prompt line.
 
-**Expected:** Next prints **Local:** `http://localhost:3000`.
-
-Open **http://localhost:3000**, start a conversation, send a message. You should see the main reply stream, then the **commentator** panel activity after the assistant finishes.
+If something fails: confirm `.venv` is activated, port **8000** is free, and `DEEPSEEK_API_KEY` has no quotes or spaces.
 
 ---
 
-### Concrete example: study notes
-
-**You send (main chat):**
-
-```text
-summarize machine learning for me
-```
-
-**Typical gap:** no audience, depth, format, or constraints.
-
-**What The Commentator is aimed at producing (illustrative refined prompt you might paste back):**
-
-```text
-Assume I'm an undergrad who knows Python and linear algebra but not ML jargon.
-Explain supervised vs unsupervised learning with one concrete example each.
-Keep it under 300 words; use short headings; no hype about AI replacing jobs.
-```
-
-Your live wording will differ; the point is **constraints + audience + shape**, not a generic summary request.
-
----
-
-## System sketch
-
-```mermaid
-flowchart LR
-  subgraph browser [Browser]
-    UI[Next.js UI]
-  end
-  subgraph api [FastAPI]
-    Chat[Chat router SSE]
-    Coach[Coach / workshop SSE]
-    DB[(SQLite)]
-  end
-  LLM[(DeepSeek API)]
-  UI -->|POST stream| Chat
-  UI -->|POST stream| Coach
-  Chat --> DB
-  Coach --> DB
-  Chat --> LLM
-  Coach --> LLM
-```
-
-Keys stay on the server; the browser only holds `NEXT_PUBLIC_API_URL` (no secrets).
-
----
-
-## Warning
-
-Self-hosting requires **`DEEPSEEK_API_KEY`** in **`backend/.env`**. Never commit `.env` or `.env.local`. Never put provider keys in `NEXT_PUBLIC_*` vars.
-
----
-
-## Configuration (reference)
+## Configuration (beyond the quickstart)
 
 ### Backend (`backend/.env`)
 
 | Variable | Required | Meaning |
 |----------|----------|---------|
-| `DEEPSEEK_API_KEY` | Yes | Outbound LLM auth |
+| `DEEPSEEK_API_KEY` | Yes | Server-side LLM auth |
 | `FRONTEND_URL` | Production | CORS origin for your UI |
 | `DB_PATH` | No | SQLite path (default `averroes.db`) |
 | `DEBUG` | No | Verbose logs if `true` |
 
-More options: `backend/.env.example`.
+See `backend/.env.example` for models, rate limits, uploads.
 
 ### Frontend (`frontend/.env.local`)
 
 | Variable | Meaning |
 |----------|---------|
-| `NEXT_PUBLIC_API_URL` | FastAPI base **without** trailing slash (default dev: `http://localhost:8000`) |
+| `NEXT_PUBLIC_API_URL` | FastAPI base URL, **no** trailing slash (default local: `http://localhost:8000`) |
 
 ---
 
@@ -199,50 +200,52 @@ More options: `backend/.env.example`.
 | `backend/app/routers/` | Chat, coach, workshop, conversations, files, spaces |
 | `backend/app/prompts/` | Assistant + coach system prompts |
 | `backend/app/services/llm.py` | Streaming DeepSeek client |
-| `frontend/lib/api.ts` | HTTP + SSE client |
+| `frontend/lib/api.ts` | Typed HTTP + SSE parsing |
 | `frontend/components/` | Chat, commentator panel, sidebar |
-
-Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (SSE event types, workshop completion).
 
 ---
 
 ## OpenAPI
 
-`/docs` and `/openapi.json` are on by default. To hide them on a public host, set `docs_url=None` and `openapi_url=None` on `FastAPI(...)` in `backend/app/main.py` (or gate on env).
+`/docs` and `/openapi.json` are on by default. Fine for dev; on a public host you may disable them in `backend/app/main.py` (`docs_url=None`, `openapi_url=None`).
 
 ---
 
 ## Deploy (outline)
 
-1. Run FastAPI somewhere that tolerates long-lived SSE connections.  
-2. Set `DEEPSEEK_API_KEY` and `FRONTEND_URL` to your real UI origin.  
+1. Run FastAPI where SSE stays open (container or VM).
+2. Set `DEEPSEEK_API_KEY` and `FRONTEND_URL` to the real UI origin.
 3. Deploy Next.js with `NEXT_PUBLIC_API_URL` pointing at that API.
 
-See `backend/railway.json` and `frontend/vercel.json` as starters (no secrets).
+`backend/railway.json` and `frontend/vercel.json` are starter configs only.
 
 ---
 
 ## GitHub metadata (copy-paste)
 
-Set these on the repo **About** cog so discovery matches what this actually is.
+Set these on the repo **About** box so search and browse classify the project.
 
-**Short description (GitHub “Description” field):**
-
-```text
-Open-source prompt coaching for LLM chat: dual-stream UI with The Commentator + 0→1 workshop, Next.js, FastAPI, SQLite, DeepSeek.
-```
-
-**Topics (suggested):**
+**Short description (350 chars max):**
 
 ```text
-prompt-engineering, llm, llm-ui, ai-chat, coaching, nextjs, fastapi, typescript, python, deepseek, server-sent-events, sqlite, self-hosted, prompt-refinement
+Open-source prompt-coaching chat UI: Commentator panel + refined prompts after each reply, 0→1 workshop mode, file-aware context. Next.js, FastAPI, SQLite, DeepSeek. Self-hosted.
 ```
+
+**Topics / tags (suggested):**
+
+```text
+prompt-engineering, llm, large-language-models, chat-ui, ai-assistant,
+fastapi, nextjs, typescript, python, deepseek, sse, server-sent-events,
+sqlite, self-hosted, coaching, human-in-the-loop
+```
+
+Pick **5 to 10** topics GitHub allows; keep the first ones highest signal.
 
 ---
 
 ## Contributing
 
-Pull requests welcome. Do not commit secrets; extend `*.example` when you add configuration.
+Pull requests welcome. Do not commit `.env`, `.env.local`, or live keys. Extend `*.example` when you add settings.
 
 ---
 
