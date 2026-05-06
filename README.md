@@ -105,7 +105,7 @@ npm run dev
 | `frontend/lib/api.ts` | Fetch wrappers and SSE parsing |
 | `frontend/components/` | Chat UI, commentator panel, sidebar |
 
-SSE event shapes and the FastAPI slash redirect note live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) spells out freestyle vs workshop routing and the SSE `type` fields per endpoint.
 
 ---
 

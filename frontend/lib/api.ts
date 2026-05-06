@@ -1,13 +1,17 @@
 /**
- * FastAPI client: base URL from NEXT_PUBLIC_API_URL (else http://localhost:8000),
- * then `/api/...` on that host. SSE stays on one response.
+ * HTTP client for the FastAPI app.
  *
- * No Next.js `/api` rewrite: long streams through serverless were unreliable.
+ * All `/api/...` requests use an absolute base URL (`NEXT_PUBLIC_API_URL`,
+ * default `http://localhost:8000`). SSE streams hit that host directly so they
+ * are not cut off by short Next/Vercel serverless limits. There are no API
+ * rewrites in `next.config.js` for this setup.
  */
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
-/* Types aligned with backend models where they match */
+/* ========================================
+   Types (mirror backend Pydantic models)
+   ======================================== */
 
 /** Conversation object from the backend */
 export interface Conversation {
@@ -152,11 +156,18 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
    ======================================== */
 
 /**
- * SSE event from the streaming endpoints.
- * The backend sends JSON-encoded events with a `type` field:
- * - "chunk": A new token to append to the response
- * - "done": Stream complete, includes the saved message ID
- * - "error": Something went wrong
+ * Parsed SSE payload (`data: {...}\\n\\n` from FastAPI).
+ *
+ * Chat stream (`/api/chat/stream`): `chunk`, then `done` with `message_id`;
+ * optional `title` after the first exchange.
+ *
+ * Coach (`/api/coach/respond`): `chunk`, then `done` with `coach_message_id`
+ * and `refined_prompt` (nullable).
+ *
+ * Workshop (`/api/coach/workshop`): same chunks; `done` adds `workshop_ready`;
+ * optional `title` on the first workshop turn.
+ *
+ * All three emit `error` with `message` on failure. See `docs/ARCHITECTURE.md`.
  */
 export interface SSEEvent {
   type: "chunk" | "done" | "error" | "title";
@@ -380,7 +391,7 @@ export async function uploadFile(conversationId: string, file: File): Promise<Fi
   const res = await fetch(
     `${API_BASE}/files/upload?conversation_id=${conversationId}`,
     { method: "POST", body: formData },
-    // Note: do NOT set Content-Type — browser sets it automatically with multipart boundary
+    // Note: do NOT set Content-Type; browser sets multipart boundary automatically
   );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
