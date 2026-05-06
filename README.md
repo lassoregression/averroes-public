@@ -10,7 +10,7 @@ The UI streams tokens over **SSE**. The backend is **FastAPI** with **SQLite** (
 > Self-hosted runs need your own **DeepSeek API key** on the server. Keep keys out of git and out of frontend env vars that ship to the browser. There is **no login** yet: the API uses a single demo user id for every caller. Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) before you expose this on a public URL.
 
 > [!Note]
-> **Hosted demo:** [averroes-llm.vercel.app](https://averroes-llm.vercel.app). That backend is whoever deployed it. Clone this repo for your own keys, data, and hosting.
+> **Hosted demo:** [averroes-llm.vercel.app](https://averroes-llm.vercel.app). That build is the same stack as this repo: **Next.js on Vercel** calling a **hosted FastAPI API** elsewhere. The API holds the DeepSeek key and database for that deployment; neither ships in git. Fork or clone the repo when you want your own backend, keys, and data.
 
 ## Requirements
 
