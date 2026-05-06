@@ -105,6 +105,8 @@ npm run dev
 | `frontend/lib/api.ts` | Fetch wrappers and SSE parsing |
 | `frontend/components/` | Chat UI, commentator panel, sidebar |
 
+SSE event shapes and the FastAPI slash redirect note live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ---
 
 ## OpenAPI and `/docs`

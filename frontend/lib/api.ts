@@ -1,23 +1,13 @@
 /**
- * Backend API Client
+ * FastAPI client: base URL from NEXT_PUBLIC_API_URL (else http://localhost:8000),
+ * then `/api/...` on that host. SSE stays on one response.
  *
- * Centralized API client for all communication with the FastAPI backend.
- * All endpoints are proxied through Next.js rewrites (see next.config.js)
- * so the frontend always calls /api/... which forwards to the backend.
- *
- * This module provides:
- * - Type-safe API calls with error handling
- * - SSE (Server-Sent Events) helpers for streaming responses
- * - Conversation, space, coach, and file management
+ * No Next.js `/api` rewrite: long streams through serverless were unreliable.
  */
 
-// Call the backend directly to avoid Vercel's 10s serverless timeout on SSE streams.
-// NEXT_PUBLIC_API_URL is set per-environment (Railway URL in prod, localhost in dev).
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api`;
 
-/* ========================================
-   Types — Mirror the backend Pydantic models
-   ======================================== */
+/* Types aligned with backend models where they match */
 
 /** Conversation object from the backend */
 export interface Conversation {
