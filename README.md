@@ -97,12 +97,6 @@ With the API running, FastAPI serves `/docs` and `/openapi.json` like any stock 
 2. Set `DEEPSEEK_API_KEY` and `FRONTEND_URL` to the real browser origin of your UI.  
 3. Deploy Next.js with `NEXT_PUBLIC_API_URL` pointing at the public API base URL.
 
-`backend/railway.json` and `frontend/vercel.json` are examples only (no secrets).
-
-## Repository metadata (GitHub)
-
-Use **Settings → General** if you want browse/search to classify the repo:
-
 * **About:** Averroes: AI prompt coach for LLM chat. Critique and rewritten prompts after each turn, workshop mode, file context. Next.js, FastAPI, DeepSeek, SSE.  
 * **Topics:** `prompt-engineering` `llm` `generative-ai` `ai-chatbot` `deepseek` `fastapi` `nextjs` `server-sent-events` `sqlite` `typescript` `python` `self-hosted` `prompt-improvement`
 
