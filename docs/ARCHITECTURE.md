@@ -8,11 +8,17 @@ The browser loads Next.js. API calls do **not** go through Next rewrites in this
 
 FastAPI owns SQLite (`DB_PATH`), prompts, and `DEEPSEEK_API_KEY`. CORS allows `FRONTEND_URL` and `http://localhost:3000` (`backend/app/main.py`).
 
-`redirect_slashes=False` on FastAPI is deliberate. Some proxies strip trailing slashes; FastAPI’s default redirects pointed browsers at `localhost` and broke tunnel setups. Collection routes use `""` instead of `"/"` where it matters.
+`redirect_slashes=False` on FastAPI is deliberate. Some proxies strip trailing slashes; default FastAPI redirects pointed browsers at `localhost` and broke tunnel setups. Collection routes use `""` instead of `"/"` where it matters.
+
+## Auth and isolation
+
+There is no login. Routers use a hard-coded `DEMO_USER_ID` (`backend/app/routers/chat.py`, `coach.py`, etc.). Anyone who can hit your deployed API sees and mutates the same logical user unless you add authentication.
+
+**Rate limiting:** `rate_limiter.check(DEMO_USER_ID)` keys off that constant, not the client IP, so every visitor shares one bucket today. Tightening this belongs with real auth (`get_rate_limit_key` in `middleware/rate_limit.py` is unused by those routes).
 
 ## Flows (behavioral, not line-by-line)
 
-**Freestyle:** User posts to chat SSE. Assistant tokens stream. After the stream ends the UI fires coach SSE (`coach_type` auto) so the commentator reacts to the latest exchange without the main model seeing that side channel.
+**Freestyle:** User posts to chat SSE. Assistant tokens stream. On `done`, `chat-panel.tsx` calls `runResponseAnalysis`, which opens coach SSE with `coach_type` `auto` after every completed assistant reply (not a separate heuristic gate). The main model never sees coach output.
 
 **Workshop:** Early turns post to `/api/coach/workshop` instead of main chat. History rows use `coach_type=workshop`. When the server decides the workshop is done (`workshop_ready` on the `done` event, see below), the client moves on; sending the refined prompt to main chat goes through `/api/coach/workshop/send`, which flips the conversation mode back to `regular`.
 

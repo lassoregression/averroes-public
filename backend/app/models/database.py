@@ -71,9 +71,9 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- Coach Messages: Feedback from The Commentator
 -- coach_type tracks how this coaching was triggered:
---   'auto' = auto-activated on weak prompt (Regular mode)
---   'manual' = user directly asked The Commentator (Regular mode)
---   'workshop' = part of the 0-to-1 workshop flow
+--   'auto' = after each main assistant reply (regular chat); UI triggers coach SSE on stream done
+--   'manual' = user opened the panel and sent a message to the coach
+--   'workshop' = 0-to-1 workshop exchange via /api/coach/workshop
 CREATE TABLE IF NOT EXISTS coach_messages (
     id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,
