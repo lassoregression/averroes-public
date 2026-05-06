@@ -1,44 +1,46 @@
 # Averroes
 
-## Overview
+Averroes is a system that evaluates a user's prompts as they write them and rewrites weak prompts so the underlying model gets clearer instructions and produces better answers.
 
-Averroes evaluates your prompts as you work and helps rewrite weaker prompts so the underlying model can answer at higher quality.
+The interface is a standard chat plus **The Commentator**, a second model call after each exchange: it reads what you and the assistant did, says what was vague or missing, and emits a tightened prompt you can paste back into the thread. A separate **0→1 workshop** mode runs a short structured dialogue (still LLM-driven) whose goal is a single polished prompt before you switch to normal chat. Uploaded PDF, DOCX, and plain text files can be attached so both the main model and the coach see extracted text in context.
 
-You write in a main conversation. A coaching panel, the Commentator, responds to each exchange with observations and a refined version of your prompt when it helps. A guided workshop mode shapes an early idea into a clearer prompt before you send it to the main chat.
+Streaming uses **Server-Sent Events**. The server is **FastAPI**, persistence is **SQLite** with FTS5 for search, and completion traffic goes to **DeepSeek** through an OpenAI-compatible HTTP API.
 
-Responses stream in real time. The server uses FastAPI and SQLite with full text search. Language requests go to DeepSeek through an OpenAI compatible HTTP API. Your API key stays on the server only.
+> **Warning:** Running your own instance requires a DeepSeek API key on the server. Never put that key in the frontend or in git. Use environment variables and your host's secret store.
 
-**Important.** Running this software requires your own [DeepSeek](https://platform.deepseek.com/) API key in backend configuration. The web app never receives that secret.
+---
 
-## Try Averroes
+## Live demo
 
-Open the live demo: [averroes-llm.vercel.app](https://averroes-llm.vercel.app)
+Try the deployed build: **[averroes-llm.vercel.app](https://averroes-llm.vercel.app)**
 
-The demo connects to a hosted backend maintained with the deployment. This repository contains source code so you can run or extend your own copy.
+The demo talks to a backend maintained by the deployer. This repo is what you run or fork when you want full control.
 
-## What you need
+---
 
-- Python 3.11 or later recommended  
-- Node.js 20 or later  
-- A DeepSeek API key  
+## Requirements
 
-You do not need FFmpeg or LaTeX.
+- Python 3.11 or newer (older 3.x may work but is untested here)
+- Node.js 20 or newer
+- [FFmpeg](https://ffmpeg.org/) and LaTeX: not used; ignore unless you add features that need them
 
-## Install the backend
+---
+
+## Install
+
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set `DEEPSEEK_API_KEY` at minimum.
+Edit `.env` and set `DEEPSEEK_API_KEY` before first launch.
 
-On Windows, activate the virtual environment with `.venv\Scripts\activate`.
-
-## Install the frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -46,30 +48,34 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` using the frontend variables below.
+Edit `.env.local` if your API is not on `http://localhost:8000` (see below).
 
-## Configure the backend
+---
 
-Variables live in `backend/.env`. See `backend/.env.example` for optional model, rate limit, and upload settings.
+## Configuration
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DEEPSEEK_API_KEY` | Yes | Authenticates the server to DeepSeek |
-| `FRONTEND_URL` | For deployment | Browser origin allowed to call the API, such as `http://localhost:3000` or your production site URL |
-| `DB_PATH` | No | Path to the SQLite file. Default is `averroes.db` |
-| `DEBUG` | No | Set to `true` for verbose logs |
+### Backend (`backend/.env`)
 
-## Configure the frontend
+| Variable | Required | Meaning |
+|----------|----------|---------|
+| `DEEPSEEK_API_KEY` | Yes | Authenticates outbound calls to DeepSeek |
+| `FRONTEND_URL` | Production | Origin allowed by CORS (your Next.js URL, or `http://localhost:3000` locally) |
+| `DB_PATH` | No | SQLite path; default `averroes.db` |
+| `DEBUG` | No | Sets log verbosity when `true` |
 
-Variables live in `frontend/.env.local`. See `frontend/.env.example`.
+Optional knobs (models, timeouts, rate limits, upload caps) are documented inline in `backend/.env.example`.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | When the UI does not share an origin with the API | Base URL of the FastAPI server with no trailing slash. Example: `http://localhost:8000`. The browser uses this for streaming over SSE |
+### Frontend (`frontend/.env.local`)
+
+| Variable | Required | Meaning |
+|----------|----------|---------|
+| `NEXT_PUBLIC_API_URL` | When the UI is not served alongside the API | Base URL of FastAPI **without** a trailing slash. The browser calls this directly so SSE is not cut off by short serverless timeouts. |
+
+---
 
 ## Run locally
 
-Start the API in one terminal:
+Terminal 1 (API):
 
 ```bash
 cd backend
@@ -77,44 +83,51 @@ source .venv/bin/activate
 uvicorn app.main:app --reload --port 8000
 ```
 
-Start the UI in another:
+Terminal 2 (web):
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Open the app at [http://localhost:3000](http://localhost:3000). Health check: [http://localhost:8000/api/health](http://localhost:8000/api/health).
+- App: [http://localhost:3000](http://localhost:3000)
+- Health: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
-## Where things live
+---
 
-| Location | Role |
-|----------|------|
-| `backend/app/routers/` | Routes for chat, coaching and workshop, conversations, files, spaces |
-| `backend/app/prompts/` | System prompts for the assistant and the Commentator |
-| `backend/app/services/llm.py` | Streaming client for DeepSeek |
-| `frontend/lib/api.ts` | Typed HTTP helpers and SSE handling |
-| `frontend/components/` | Chat, Commentator panel, sidebar |
+## Repository layout
 
-## API explorer and OpenAPI
+| Path | Responsibility |
+|------|----------------|
+| `backend/app/routers/` | HTTP: chat, coach and workshop, conversations, files, spaces |
+| `backend/app/prompts/` | System prompts for the assistant and for the coach |
+| `backend/app/services/llm.py` | Streaming client to DeepSeek |
+| `frontend/lib/api.ts` | Fetch wrappers and SSE parsing |
+| `frontend/components/` | Chat UI, commentator panel, sidebar |
 
-By default, FastAPI serves Swagger UI at `/docs` and the OpenAPI description at `/openapi.json`.
+---
 
-Both help during development. Anyone who can reach your server can see route shapes and try requests.
+## OpenAPI and `/docs`
 
-On a public production host, some teams disable those URLs so the schema is not a ready map for automated probing. That choice is optional. To turn them off or tie them to an environment flag, adjust how `FastAPI` is constructed in `backend/app/main.py`.
+FastAPI serves interactive docs at `/docs` and the schema at `/openapi.json`. Anyone who can reach the host can read the full route list. That helps local development and contributors; on an exposed production host it also helps strangers map your surface area. To hide both, pass `docs_url=None` and `openapi_url=None` into `FastAPI(...)` in `backend/app/main.py` (or tie visibility to an env flag).
 
-## Deploy your own copy
+---
 
-1. Run the backend where long lived connections and SSE are supported.
-2. Set `DEEPSEEK_API_KEY` and `FRONTEND_URL` to match your real web origin.
-3. Deploy the frontend and set `NEXT_PUBLIC_API_URL` to your public API base URL.
+## Deploy
 
-Files such as `backend/railway.json` and `frontend/vercel.json` are minimal starter configuration. They contain no secrets.
+1. Run the API somewhere that keeps long-lived HTTP connections (SSE). Container platforms and small VMs both work.
+2. Inject `DEEPSEEK_API_KEY` and set `FRONTEND_URL` to the exact browser origin of your UI.
+3. Build and host the Next app; set `NEXT_PUBLIC_API_URL` to the public API base URL.
 
-## Contribute
+`backend/railway.json` and `frontend/vercel.json` are reference configs only. They contain no secrets.
 
-Issues and pull requests are welcome. Commit `.env.example` only. Do not commit API keys or personal environment files.
+---
+
+## Contributing
+
+Pull requests are welcome. Do not commit `.env`, `.env.local`, or real keys. Extend `*.example` files when you add new settings.
+
+---
 
 ## License
 
